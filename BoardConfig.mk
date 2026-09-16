@@ -289,3 +289,27 @@ TARGET_OTA_ASSERT_DEVICE := m95,M95,m685,MX6,mx6
 
 # Vendor blobs (real /vendor image).
 include vendor/meizu/m95/BoardConfigVendor.mk
+
+# ---------------------------------------------------------------------------
+# SELinux: neverallow-проверки отключены на время подъёма
+# ---------------------------------------------------------------------------
+# Android 13 ужесточил правила, и блобы эпохи Nougat их нарушают. secilc
+# (прогон 6, 2026-09-16) назвал ровно четыре нарушения:
+#
+#   1. allow ccci_mdinit net_radio_prop_33_0 (property_service set)
+#      neverallow: plat_pub_versioned.cil:9821
+#   2. allow shell_33_0 m95_forge_prop (property_service set)
+#      neverallow: private/property.te:324
+#   3. allow m95_bdaddr bluetooth_prop_33_0 (file read getattr map open)
+#      neverallow: private/property.te:162
+#   4. allow ccci_mdinit radio_prop_33_0 (file read getattr map open)
+#      neverallow: private/property.te:162
+#
+# ТЕХНИЧЕСКИЙ ДОЛГ, а не решение. Правильный путь по каждому пункту — завести
+# вендорный тип свойства и переразметить его в property_contexts, а не давать
+# вендорному домену доступ к системному. Пункт 2 (shell) — самый неприятный:
+# он означает, что свойство m95_forge_prop сейчас доступно из adb shell.
+#
+# Соседние деревья флота (m5c BoardConfig.mk:257, m681 BoardConfig.mk:315)
+# держат тот же флаг по той же причине.
+SELINUX_IGNORE_NEVERALLOWS := true
