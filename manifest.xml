@@ -13,7 +13,15 @@
      ships its own VINTF fragment (wifi@1.0-service, gatekeeper@1.0-
      service.software, fingerprint@2.0-service.m95) are deliberately absent:
      the build merges those fragments into this manifest. -->
-<manifest version="1.0" type="device" target-level="1">
+<!-- 2026-09-17: target-level 1 -> 3 (FACT).
+     Android 13 несёт только матрицы FCM 3..7 (hardware/interfaces/compatibility_matrices/);
+     уровень 1 (Android 8.0) больше не существует, и ota_from_target_files падал:
+       checkvintf: Cannot find framework matrix at FCM version 1 (exit 70).
+     Проверено на копии манифеста тем же checkvintf с теми же dirmap, что в сборке:
+       target-level=3 -> rc=0 (совместим), 4 -> rc=65, 5 -> rc=65.
+     3 = матрица Android 9 — соответствует вендору, портированному с Pie/A11.
+     Это НЕ пропуск проверки: совместимость с матрицей 3 реально проходит. -->
+<manifest version="1.0" type="device" target-level="3">
     <!-- Both 2.0 and 6.0 are declared, and both impls are installed: the
          combined android.hardware.audio.service registers the FIRST version
          whose impl library is present, i.e. 6.0, and falls back to 2.0 only if
