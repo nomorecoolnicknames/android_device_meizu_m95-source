@@ -103,6 +103,17 @@ BOARD_KERNEL_IMAGE_NAME := Image.gz-dtb
 TARGET_KERNEL_SOURCE := kernel/meizu/m95
 TARGET_KERNEL_CONFIG := lineage_m95_defconfig
 
+# headers_install собирает хостовую утилиту scripts/basic/fixdep, а ядро 3.18
+# линкует хост-программы тем же $(HOSTCC) (Makefile:298 "HOSTCC = gcc";
+# scripts/Makefile.host:88 — отдельного HOSTLDFLAGS в 3.18 нет).
+# В песочнице Soong системные инструменты запрещены намеренно
+# ("System tools are no longer allowed on 10+", kernel.mk:264), GNU ld там нет,
+# и clang падает с 'Executable "ld" doesn't exist'.
+# В prebuilts AOSP есть ld.lld — направляем хостовый clang на него.
+# Одним токеном без пробелов: значение проходит через KERNEL_MAKE_FLAGS в
+# genrule-команду Soong, и кавычки на этом пути ненадёжны.
+TARGET_KERNEL_ADDITIONAL_FLAGS := HOSTCFLAGS=-fuse-ld=lld
+
 # Исходник есть и конфиг задан, поэтому без этого флага kernel.mk:192 полез бы
 # собирать ядро из исходников. Нам нужен именно прибилт: ветка kernel.mk:180-190
 # даёт FULL_KERNEL_BUILD := false и KERNEL_BIN := $(TARGET_PREBUILT_KERNEL).
