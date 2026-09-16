@@ -3,9 +3,9 @@
 // WHY (FACT, measured 2026-09-16 on this tree): every Android.bp without a
 // soong_namespace lands in the root namespace "." (build/soong/android/
 // namespace.go:193), soong_build always exports "." to kati (build/soong/cmd/
-// soong_build/main.go:105), and every module of an exported namespace gets
+// soong_build/main.go:106), and every module of an exported namespace gets
 // NamespaceExportedToMake = true (namespace.go:204), which is the only thing
-// androidmk.go:918 checks before writing the module's install rule into
+// androidmk.go:919 checks before writing the module's install rule into
 // installs-<product>.mk.  Soong has no TARGET_DEVICE guard (kati does), so a
 // module declared in ONE device tree gets install rules in EVERY product of
 // this workspace.  Measured before this file existed: a plain `m nothing`

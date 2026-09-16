@@ -23,7 +23,7 @@ LOCAL_PATH := device/meizu/m95
 # libm95shim_perfservice).  Modules of a namespace reach Make only for the
 # products that list that namespace here
 # (build/soong/cmd/soong_build/main.go:99-112 -> android/namespace.go:204 ->
-# android/androidmk.go:918).  Each tree carries a root Android.bp with
+# android/androidmk.go:919).  Each tree carries a root Android.bp with
 # `soong_namespace {}`; this line is the other half of the pair.
 # ---------------------------------------------------------------------------
 PRODUCT_SOONG_NAMESPACES += \
