@@ -33,6 +33,58 @@
 #     (libGLES_mali.so — no GPU without it), the Trustonic trustlets in
 #     vendor/app/mcRegistry/ and the Meizu camera / Goodix libs that live in
 #     /system/lib{,64}.
+#
+# BLOB AUDIT 2026-09-16 (fleet hygiene pass): NOTHING REMOVED — and that is a
+# measured result, not an omission.
+#
+# QUESTION ASKED: which line of this list names a file that Android 13 builds
+# from source and would therefore be silently overridden by a PRODUCT_COPY_FILES
+# rule (copy rule from build/make/core/Makefile:72 beats the module rule in
+# base_rules.mk:533 / installs-<product>.mk)?
+#
+# METHOD (reproducible): all 906 distinct destinations of this list were
+# intersected with every install destination Soong wrote for this product,
+# <original-workspace>/los20-out/out-m95/soong/installs-lineage_m95.mk (36592
+# destinations, from the m95 build of 2026-09-16); then the same was done by
+# BASENAME, to catch a blob that shadows an A13 module sitting in a different
+# directory.
+#
+# RESULT — exactly one destination is shared, in both bitnesses:
+#   vendor/lib{,64}/hw/fingerprint.default.so
+#     A13 builds hardware/libhardware/modules/fingerprint/fingerprint.default
+#     into that path (installs-lineage_m95.mk:90562,90566), and kati confirms
+#     the collision out loud: "overriding commands for target
+#     .../vendor/lib64/hw/fingerprint.default.so" in
+#     <original-workspace>/meizu-fleet/build-m95.log — the ONLY such warning in
+#     that whole log.
+#     THE BLOB STAYS.  FACT: proprietary/lib{,64}/hw/fingerprint.default.so is
+#     the Goodix vendor HAL — .name "Goodix Fingerprint HAL", DT_NEEDED
+#     libgf_hal.so / libgf_ca.so / libgoodixfingerprintd_binder.so, built with
+#     "GCC: (GNU) 4.9 20150123 (prerelease)".  AOSP's fingerprint.default is
+#     the "Demo Fingerprint HAL" (hardware/libhardware/modules/fingerprint/
+#     fingerprint.c:120) and does nothing.  So this is the one collision we
+#     want, in the same sense as power.default.so on the m5c.
+#
+# NEAR MISSES, checked and deliberately left alone:
+#   vendor/lib/libbt-vendor.so — device/meizu/m95/shims builds
+#     libm95shim_btvendor into vendor/lib64/libbt-vendor.so, 64-bit ONLY; this
+#     blob line is the 32-bit file.  They do not collide today.  HYPOTHESIS: if
+#     the shim ever grows a 32-bit variant the winner becomes makefile order —
+#     drop this line at that moment.
+#   vendor/lib{,64}/liblogwrap.so — A13 builds system/logging/logwrapper into
+#     system/lib{,64}/liblogwrap.so and into the ramdisk, never into /vendor.
+#     The /vendor copy is the same class of deliberate second copy as
+#     libbinder.so / libnetutils.so (M95_LOS20_TREE.md §"второй libbinder"),
+#     which that report declares mandatory.  Not touched.
+#   vendor/etc/security/cacerts_supl/594f1775.0 — A13 ships a file of the same
+#     name under system/etc/security/cacerts_google/.  Different directory,
+#     different consumer (SUPL); no collision.
+#
+# WHAT WAS *NOT* CHECKED HERE (honest gap): this intersection sees Soong
+# modules and the kati warnings of a real build.  A module declared only in an
+# Android.mk of an unrelated tree and not reached by this product's kati pass
+# would not show up.  For this workspace that gap is covered by the fact that
+# the m95 build log contains exactly one overriding-commands warning.
 
 system/bin/goodixfingerprintd:vendor/bin/goodixfingerprintd
 system/lib/hw/fingerprint.default.so:vendor/lib/hw/fingerprint.default.so
