@@ -1,0 +1,62 @@
+# MTK WMT combo-chip bring-up (Wi-Fi/BT/GPS/FM share one chip).
+#
+# Chain (stock Flyme order): wmt_loader -> wmt_launcher (patch download) ->
+# wmt_concurrency. All three binaries exist in vendor/meizu/m95 [DEV], but
+# NONE are started by our init.mt6797.rc yet — the domains below are prepared
+# so services can be added without touching sepolicy again. Every allow rule
+# in this file is m681-template/MTK convention [CONV] until m95 denials
+# confirm it.
+
+type wmt_loader, domain;
+type wmt_launcher, domain;
+type wmt_concurrency, domain;
+
+init_daemon_domain(wmt_loader)
+init_daemon_domain(wmt_launcher)
+init_daemon_domain(wmt_concurrency)
+
+allow wmt_loader stpwmt_device:chr_file rw_file_perms;
+allow wmt_loader wmtdetect_device:chr_file rw_file_perms;
+set_prop(wmt_loader, wmt_prop)
+
+allow wmt_launcher stpwmt_device:chr_file rw_file_perms;
+allow wmt_launcher wmtdetect_device:chr_file rw_file_perms;
+allow wmt_launcher mtk_wmt_proc:file rw_file_perms;
+# firmware patches live under /vendor (system/vendor here)
+r_dir_file(wmt_launcher, vendor_file)
+set_prop(wmt_launcher, wmt_prop)
+
+allow wmt_concurrency stpwmt_device:chr_file rw_file_perms;
+get_prop(wmt_concurrency, wmt_prop)
+
+# The wifi/bt function nodes (/dev/wmtWifi, /dev/stpbt) are created at
+# runtime when the loader pokes the chip, i.e. after ueventd's cold boot —
+# ueventd must be able to relabel them [CONV: proven necessary on m681].
+allow ueventd device:chr_file relabelfrom;
+allow ueventd wmtWifi_device:chr_file relabelto;
+allow ueventd stpbt_device:chr_file relabelto;
+allow init device:chr_file { create setattr };
+allow init stpwmt_device:chr_file rw_file_perms;
+allow init stpbt_device:chr_file rw_file_perms;
+allow init wmtWifi_device:chr_file rw_file_perms;
+
+# Wi-Fi on/off is a write to /dev/wmtWifi; both the legacy path
+# (system_server) and the wifi HAL may do it. [CONV]
+allow system_server wmtWifi_device:chr_file rw_file_perms;
+allow hal_wifi_default wmtWifi_device:chr_file rw_file_perms;
+get_prop(hal_wifi_default, wmt_prop)
+
+# Bluetooth stack talks to /dev/stpbt directly on MTK. [CONV]
+allow bluetooth stpbt_device:chr_file rw_file_perms;
+allow hal_bluetooth_default stpbt_device:chr_file rw_file_perms;
+get_prop(bluetooth, wmt_prop)
+get_prop(hal_bluetooth_default, wmt_prop)
+get_prop(system_server, wmt_prop)
+
+# 2026-08-14 census: the Bluetooth HAL reads the NVRAM readiness property and
+# the NV data tree while bringing up the combo chip (BT MAC lives in
+# /data/nvram/APCFG/APRDEB/BT, same store the Wi-Fi half reads via
+# kernel.te). FACT: { read open getattr } on the nvram_prop property page and
+# { read } on an nvdata_file (comm HwBinder:366_1).
+get_prop(hal_bluetooth_default, nvram_prop)
+r_dir_file(hal_bluetooth_default, nvdata_file)

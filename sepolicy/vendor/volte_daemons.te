@@ -1,0 +1,157 @@
+# VoLTE AP-stack daemons — /vendor/bin/volte_ua (the SIP user agent),
+# /vendor/bin/volte_stack (SIP transactions/timers), /vendor/bin/volte_imcb
+# (IMS control block). Skeleton domains on the mtkmal.te starting-set method.
+#
+# WHY NOW: the 2026-08-18 census #2 proved mtkmal itself drives these three
+# via ctl.start$/ctl.stop$ (FACT: denied { set } property=
+# ctl.stop$volte_{stack,ua,imcb} from u:r:mtkmal:s0). Until this change the
+# services did not exist in any rc of our build, so the control messages hit
+# nothing. Definitions are ported from the stock m95 boot ramdisk
+# init.volte.rc into rootdir/init.m95.volte.rc.
+#
+# DELIBERATELY MINIMAL: logging, /dev/null, own sockets — the mtkmal.te
+# starting set. All three services are oneshot+disabled, they run only when
+# mtkmal starts them, so an incomplete domain cannot hurt boot; their first
+# real run produces the census that finishes each domain. Vendor lib loading
+# needs no rule here -- but NOT for the reason this comment used to give.
+#
+# CORRECTION 2026-09-09 (enforcing lane). The old text credited "the
+# not_full_treble branch of public/domain.te". That branch is NOT compiled on
+# 18.1: BoardConfig.mk:113 sets PRODUCT_FULL_TREBLE_OVERRIDE := true, and
+# system/build.prop:74 of the built image says ro.treble.enabled=true. Had that
+# been the only thing holding these three up, they would fail to load a single
+# vendor library under enforcing and VoLTE would die at the first
+# `start volte_imcb`.
+#
+# Checked before assuming: the grant exists on the OTHER side of the same
+# guard. public/domain.te:190-204 is a full_treble_only() block, and inside it
+#   allow { domain -coredomain } vendor_file_type:dir  r_dir_perms;
+#   allow { domain -coredomain } vendor_file_type:file { read open getattr execute map };
+# covers every vendor domain, these three included (none is coredomain), and
+# covers dir *read* as well -- so even the mtkmal opendir() caveat is moot on
+# this branch. Conclusion unchanged, reasoning replaced.
+
+type volte_ua, domain;
+type volte_ua_exec, exec_type, vendor_file_type, file_type;
+init_daemon_domain(volte_ua)
+
+type volte_stack, domain;
+type volte_stack_exec, exec_type, vendor_file_type, file_type;
+init_daemon_domain(volte_stack)
+
+type volte_imcb, domain;
+type volte_imcb_exec, exec_type, vendor_file_type, file_type;
+init_daemon_domain(volte_imcb)
+
+# Logging + /dev/null: the logd_client() hand-expansion used across this tree.
+allow { volte_ua volte_stack volte_imcb } pmsg_device:chr_file w_file_perms;
+allow { volte_ua volte_stack volte_imcb } logdw_socket:sock_file write;
+allow { volte_ua volte_stack volte_imcb } logd:unix_dgram_socket sendto;
+allow { volte_ua volte_stack volte_imcb } null_device:chr_file rw_file_perms;
+
+# Their init-created sockets (volte_ua, volte_stack, volte_imsa1/2,
+# volte_imsvt1/2, volte_ut — see rootdir/init.m95.volte.rc) arrive as
+# inherited fds; listen/accept live on self:unix_stream_socket.
+allow { volte_ua volte_stack volte_imcb } socket_device:dir search;
+allow { volte_ua volte_stack volte_imcb } self:unix_stream_socket create_stream_socket_perms;
+allow { volte_ua volte_stack volte_imcb } self:unix_dgram_socket create_socket_perms;
+
+# PREDICTED FIRST CENSUS (not granted, by the census discipline): connects
+# into each other's sockets and into mtkmal_socket (sock_file write + peer
+# unix_stream_socket connectto), inet dgram/stream sockets in volte_ua (SIP
+# over the IMS PDN), possibly ccci/tty nodes and wake locks. Collect with
+#   dmesg | grep -E 'scontext=u:r:volte_(ua|stack|imcb)'
+# after the first ctl.start actually fires.
+
+# == 2026-08-21 census #1: first real run of all three daemons ==
+# SIM back (gsm.sim.state=LOADED, LTE registered on 250-xx), boot image built
+# 2026-08-21 13:32 UTC. The daemons were started via the ctl.start path and
+# the device then ran PERMISSIVE for the rest of the session, so this census
+# is complete for idle bring-up: every check the daemons hit is logged, not
+# only the first barrier. Decoded in the m95 repo
+# analysis-lanes/volte-impl-2.md (2026-08-21 entry).
+
+# The rendezvous bus, exactly as predicted: imcb connects into volte_ua's
+# listener, ua and stack itself into volte_stack's. FACT: denied { write }
+# name="volte_stack"/"volte_ua" tclass=sock_file tcontext=socket_device +
+# { connectto } peer u:r:volte_stack / u:r:volte_ua. The sockets get owner
+# types (file.te / file_contexts) so nobody needs blanket
+# socket_device:sock_file write.
+allow volte_ua volte_stack_socket:sock_file write;
+allow volte_ua volte_stack:unix_stream_socket connectto;
+allow volte_imcb volte_ua_socket:sock_file write;
+allow volte_imcb volte_ua:unix_stream_socket connectto;
+allow volte_stack volte_stack_socket:sock_file write;
+# Peer half of stack's connect into its own listener. INFERENCE, not census:
+# even permissive logged only the sock_file write, but the grant is
+# self-scoped and an omission here would cost a flash cycle if the check does
+# fire under enforcing (mtkmal.te took the same trade).
+allow volte_stack self:unix_stream_socket connectto;
+
+# Privilege drop at startup. FACT: { setuid } capability=7 and { setgid }
+# capability=6 from volte_stack (it runs as system after the drop),
+# { setgid } from volte_ua. The permissive-complete census shows no setuid
+# from ua — it only regroups, do not pre-grant.
+allow volte_stack self:capability { setuid setgid };
+allow volte_ua self:capability setgid;
+
+# IPsec control: IMS signalling SAs (3GPP SIP ipsec-3gpp) are managed over
+# netlink xfrm. FACT: { create bind write read nlmsg_read } on
+# self:netlink_xfrm_socket + { net_admin } self:capability, all volte_stack.
+# nlmsg_write has NOT appeared — no SA is installed before an IMS PDN and a
+# registration attempt exist. Expect it in the first registration census;
+# deliberately not pre-granted.
+allow volte_stack self:capability net_admin;
+allow volte_stack self:netlink_xfrm_socket { create bind read write nlmsg_read };
+
+# PREDICTED CENSUS #2 (described, not granted):
+# - volte_ua inet stream/dgram sockets once an IMS PDN comes up (SIP);
+# - volte_stack netlink_xfrm_socket nlmsg_write at first registration;
+# - clients from the Java IMS half into volte_imcb_socket (imsa/imsvt/ut)
+#   and into volte_ua_socket when the APK lands;
+# - possibly ccci/tty nodes for volte_imcb.
+
+# CENSUS #3, measured 2026-08-24 on the first boot where the daemons actually
+# ran. Both were predicted above; both are granted now that a real denial names
+# them, rather than on the strength of the prediction.
+#
+# volte_imcb walks sysfs looking for the modem's ccci nodes. This is the search
+# on the directory only -- reading a node is a separate permission and is not
+# granted until something is measured needing it, because that belongs to the
+# first bearer activation rather than to startup.
+allow volte_imcb sysfs_ccci:dir search;
+
+# mtkmal writes into volte_imcb's socket. Giving each daemon's socket a type of
+# its own is what made this visible: mtkmal is a client of imcb the same way
+# rild is a client of mtkmal, and the same omission was made both times --
+# typing the socket and then forgetting who knocks on it.
+allow mtkmal volte_imcb_socket:sock_file write;
+
+# CENSUS #4, measured 2026-08-24 after the modem accepted the enable and the
+# daemons came up with real work to do. Both follow from what census #3 granted:
+# once mtkmal may write imcb's socket it goes on to connect on it, and once
+# volte_imcb may walk the ccci directory it goes on to read the node in it.
+allow mtkmal volte_imcb:unix_stream_socket connectto;
+allow volte_imcb sysfs_ccci:file r_file_perms;
+
+# CENSUS #5, measured 2026-08-24: volte_imcb opens the modem's IMS control
+# channel. This is the access predicted back in census #3 as belonging to the
+# first bearer activation rather than to startup, and it arrived exactly there
+# -- after the modem accepted the enable and the daemons had work to do.
+#
+# The node is /dev/ccci_imsc, mode 660 radio:radio, and the daemon runs as
+# radio, so DAC already permits it; only the label stood in the way.
+allow volte_imcb ccci_device:chr_file rw_file_perms;
+
+# CENSUS #6, measured 2026-08-27 (live11, boot b27): the SIP transport itself.
+# With the IMS PDN finally up on ccmni4 and the P-CSCF list delivered
+# (imcb_send_ua_ip_change -> Reg[0] Disconnect -> Connecting), volte_stack
+# tried to open its SIP socket to 10.153.5.28:5060 and was refused:
+#   avc: denied { create } scontext=u:r:volte_stack tclass=udp_socket
+# The blob treats that as fatal ("VoLTE SOC: @@@ ASSER @@@: socket() failed !",
+# soc_api.c:369) and the process dies, so registration never leaves the box.
+# net_domain() is the right grant: these daemons ARE network daemons -- SIP
+# signalling over the IMS bearer (UDP 5060, TCP fallback per the stack's
+# use_udp_on_tcp_fail setting) and, in volte_ua, the RTP/RTCP media sockets.
+net_domain(volte_stack)
+net_domain(volte_ua)

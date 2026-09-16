@@ -1,0 +1,69 @@
+# VoLTE AP-stack services — ported from the stock m95 boot ramdisk
+# init.volte.rc (Flyme 8.0.5.0A, stock/boot.img, extracted 2026-08-18).
+# Differences from stock, both deliberate:
+#  - volte_rcs_ua omitted: its binary does not exist in our vendor image;
+#  - nothing else changed — including volte_imcb running `user root`, which
+#    is what the m95 stock has (the m681 template says `user system` there).
+# All three are oneshot+disabled: nothing starts at boot. mtkmal starts and
+# stops them via ctl.start$/ctl.stop$ (2026-08-18 census #2; sepolicy
+# volte_daemons.te + ctl_volte_prop). No seclabel needed: the domains
+# transition from the executables' types (sepolicy/file_contexts).
+
+service volte_ua /vendor/bin/volte_ua
+    class core
+    socket volte_ua stream 660 root system
+    user root
+    group system log inet radio net_admin root
+    oneshot
+    disabled
+
+service volte_stack /vendor/bin/volte_stack
+    class core
+    socket volte_stack stream 660 root system
+    user root
+    group system log inet radio
+    oneshot
+    disabled
+
+service volte_imcb /vendor/bin/volte_imcb
+    class core
+    socket volte_imsa1 stream 660 root radio
+    socket volte_imsa2 stream 660 root radio
+    socket volte_imsvt1 stream 660 root radio
+    socket volte_imsvt2 stream 660 root radio
+    socket volte_ut stream 660 root radio
+    user root
+    group system log inet radio
+    oneshot
+    disabled
+
+# Not from stock: the URC-3056 -> 900003 forwarder standing in for the missing
+# Java IMS half's daemon-start reflex (volte-kicker/volte_kicker.c,
+# sepolicy/volte_kicker.te). Runs as radio because rild-ims identifies its
+# client by SO_PEERCRED uid name and accepts only "radio"; group radio passes
+# the 660 root:radio DAC on both sockets it connects to. It declares no
+# sockets, so Pie init's ANDROID_SOCKET_* name mangling (dash -> underscore)
+# never comes into play — it connects to /dev/socket/rild-ims and
+# /dev/socket/volte_imsm by path. oneshot: the binary loops and reconnects on
+# its own for as long as it has work; when it exits by choice (property off)
+# init must not respawn it.
+service volte_kicker /vendor/bin/volte_kicker
+    class core
+    user radio
+    group radio
+    oneshot
+    disabled
+
+# CYCLE 3 (2026-08-24, volte-ims-java): autostart OFF again, deliberately.
+# volte_kicker was briefly re-enabled to start the daemons after the app missed
+# the +EIMS:1 URC. But that SPLIT the volte_imsm channel: whoever sends the
+# 900003 ENABLE_IND becomes the MAL's client and gets its replies (PDN_ACT_REQ
+# 900008, ...). With volte_kicker as the enabler, the MAL delivered those to the
+# kicker's socket (which ignores them) and the app got ZERO frames — no IMS PDN
+# request, no registration (measured 2026-08-24: MAL frames to app = 0). The app
+# now sends 900003 itself (ImsService.initImsAvailability synthesizes the enable
+# because it misses the URC), so IT must be the sole enabler. Kicker retargeted
+# to a defaults-off property; re-arm only as a fallback with
+# `setprop persist.forge.volte_kicker 1`. See analysis-lanes/volte-port.md.
+on property:persist.forge.volte_kicker=1
+    start volte_kicker

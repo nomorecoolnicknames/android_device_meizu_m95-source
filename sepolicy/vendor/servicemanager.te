@@ -1,0 +1,13 @@
+# servicemanager device extras — Meizu MX6 (m95).
+#
+# When a vendor daemon registers a plain binder service, servicemanager runs
+# its mac_permissions/pid check against /proc/<pid>. FACT (2026-08-14 census):
+#   avc: denied { search } for name="367" scontext=u:r:servicemanager:s0
+#        tcontext=u:r:hal_camera_default:s0 tclass=dir
+# (pid 367 is the camera provider). The base policy grants servicemanager
+# this only for coredomain registrants. Scoped to the two vendor domains that
+# register/are looked up through the plat servicemanager on this non-Treble
+# build; file read is the companion the /proc/<pid>/attr read needs.
+allow servicemanager { hal_camera_default pq }:dir search;
+allow servicemanager { hal_camera_default pq }:file r_file_perms;
+allow servicemanager { hal_camera_default pq }:process getattr;

@@ -1,0 +1,135 @@
+# kernel — the domain kernel threads and kernel-context work run in.
+#
+# Two findings from the 2026-08-10 permissive sweep land in this domain. One
+# gets a rule. The other CANNOT get one, and saying so here is the point of the
+# second half of this file.
+
+##########################
+# cpuset hotplug cannot evacuate tasks from an emptied cpuset.
+#
+# FACT (live device, 2026-08-10):
+#   avc: denied { setsched } for comm="kworker/4:3"
+#        scontext=u:r:kernel:s0 tcontext=u:r:system_app:s0
+#        tclass=process  permissive=1                                    (x1)
+#
+# FACT, the source chain, all in kernel/m685/kernel/cpuset.c:
+#   :292-293  static DECLARE_WORK(cpuset_hotplug_work, cpuset_hotplug_workfn)
+#             - so it runs on a kworker, which is why scontext is kernel
+#   :2242     cpuset_hotplug_workfn()
+#   :2156     hotplug_update_tasks_legacy() -> remove_tasks_in_empty_cpuset(cs)
+#   :2115     remove_tasks_in_empty_cpuset() -> cgroup_transfer_tasks()
+#   :1410     cgroup_transfer_tasks() -> cpuset_can_attach()
+#   :1441       ret = security_task_setscheduler(task);
+#               if (ret) goto out_unlock;
+# security_task_setscheduler() is selinux_task_setscheduler(), which checks
+# PROCESS__SETSCHED from the CURRENT task (the kworker, i.e. kernel) to the
+# task being moved (here system_app).
+#
+# WHAT BREAKS WITHOUT IT, under enforcing: the check returns -EACCES,
+# cpuset_can_attach aborts at :1442, cgroup_transfer_tasks fails, and tasks left
+# behind in a cpuset that hotplug has just emptied cannot be moved up to the
+# parent. On this deca-core that is not hypothetical - sepolicy/toolbox.te and
+# rootdir/m95-cpuset.sh document cpusets on this device collapsing to a single
+# A53 under exactly this hotplug behaviour. This is the same pathology with the
+# kernel's own escape hatch nailed shut, and unlike the cpuset decay it cannot
+# be mitigated from userspace at all.
+#
+# ON THE TARGET SCOPE, honestly: `domain` is every domain, and that is wider
+# than the one observation. It is still the right scope. The target is whichever
+# task happened to be resident in the cpuset that hotplug emptied - system_app
+# in this sample, any domain in the next one - so a per-domain list would be
+# whack-a-mole that fails silently the first time it misses. What is kept narrow
+# is everything else: one permission, one class, and a source domain that is the
+# kernel itself. There is no platform neverallow on process:setsched (checked:
+# no `neverallow ... setsched` anywhere in system/sepolicy public/ or private/).
+allow kernel domain:process setsched;
+
+##########################
+# DELIBERATELY LEFT DENIED - and in one case, CANNOT be allowed.
+#
+# The Wi-Fi combo-chip NVRAM read, reported by both the connectivity and the
+# telephony sweeps, fires as a PAIR of denials from the same comm in the same
+# millisecond:
+#   avc: denied { read open } for comm="mtk_wmtd"
+#        path="/data/nvram/APCFG/APRDEB/WIFI"
+#        scontext=u:r:kernel:s0 tcontext=u:object_r:nvdata_file:s0
+#        tclass=file  permissive=1
+#   avc: denied { dac_override } for comm="mtk_wmtd"
+#        scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0
+#        tclass=capability  permissive=1
+#
+# NO RULE IS WRITTEN HERE FOR EITHER, for two different reasons.
+#
+# 1. The dac_override half is NEVERALLOWED by the platform and would fail the
+#    build. FACT, system/sepolicy/public/kernel.te, verbatim:
+#      # the kernel should not be accessing files owned by other users.
+#      # Instead of adding dac_{read_search,override}, fix the unix permissions
+#      # on files being accessed.
+#      neverallow kernel self:global_capability_class_set
+#          { dac_override dac_read_search };
+#    global_capability_class_set covers the `capability` class, so
+#    `allow kernel self:capability dac_override;` is not a policy decision that
+#    is available to make. Anyone who writes it will get a neverallow failure
+#    out of checkpolicy, not a working Wi-Fi NVRAM read.
+#
+# 2. That matters for the OTHER half too, and this is the part worth carrying
+#    forward: the connectivity sweep proposed `r_dir_file(kernel, nvdata_file)`
+#    as the fix shape. If dac_override is genuinely required to reach the file
+#    then that rule ALONE will not restore the read under enforcing - SELinux
+#    would permit it and DAC would still refuse it. The two checks are
+#    independent and only one of them is fixable in policy.
+#
+# The platform's own instruction is the way out: fix the unix permissions. The
+# file is `-rw-rw---- root system` and mtk_wmtd is a kernel thread, which should
+# not need dac_override for a root-owned file at all - so the interesting
+# question is which component of the path lookup is actually short of DAC
+# rights, and that has not been established. HYPOTHESIS: a directory mode
+# somewhere in /data/nvram/APCFG/APRDEB, or a kernel thread cred with a
+# restricted capability set. FALSIFIER: `ls -ldZ` every component from /data
+# down to the WIFI file and compare against the kernel thread's /proc/N/status
+# CapEff. That needs root, which this pass did not take on a shared device.
+#
+# Owner: the connectivity lane (kalCfgDataRead16 / glLoadNvram, MAC + country
+# code + TX power table + ucEnable5GBand). Left here rather than in
+# connectivity.te only because the blocking constraint is a neverallow on the
+# `kernel` domain, and this is that domain's file.
+
+# RESOLVED — the falsifier above was run, and the answer unblocks the fix.
+#
+# FACT (live device, 2026-08-10):
+#   /data/nvram, /data/nvram/APCFG, /data/nvram/APCFG/APRDEB
+#                                       drwxrwx--x root system
+#   /data/nvram/APCFG/APRDEB/WIFI       -rw-rw---- root system
+#   mtk_wmtd pid 473:  Uid: 0 0 0 0     CapEff: 0000003fffffffff
+#
+# So the thread is root with the complete capability set, and every component
+# of the path grants the owner what the read needs: rwx on each directory for
+# traversal, rw on the file itself. DAC is satisfied end to end without
+# dac_override.
+#
+# INFERENCE: the dac_override denial is SPURIOUS. The kernel probes
+# capable(CAP_DAC_OVERRIDE) on some permission paths regardless of whether the
+# access would already succeed, and SELinux audits the probe. It is logged, not
+# required — which is why the read works today beyond the mere fact that we are
+# permissive.
+#
+# That reverses the earlier conclusion. The SELinux half is NOT useless without
+# the capability: allowing the file read alone does restore this under
+# enforcing, because DAC was never the obstacle. Writing it.
+#
+# What breaks without it: wmt_ic_6628.c:1442 reads this file as
+# WMT_CTRL_CRYSTAL_TRIMING_GET, and wlan/gen3 uses it as WIFI_NVRAM_FILE_NAME.
+# Denied, the combo chip falls back to bIsNvramExist=FALSE with a zero crystal
+# trim offset and the gen3 path loses the MAC and calibration blob — an
+# untrimmed reference crystal and degraded RF, silently, at defaults.
+allow kernel nvdata_file:dir search;
+allow kernel nvdata_file:file r_file_perms;
+
+##########################
+# 2026-08-14: silence the spurious probe documented above. The RESOLVED
+# analysis established mtk_wmtd is root with a full capability set and every
+# path component grants the access without CAP_DAC_OVERRIDE — the kernel
+# audits a capable() probe it does not need. The allow is neverallowed by the
+# platform (public/kernel.te), and granting it is not needed; dontaudit is
+# the correct remaining half so the 6-per-boot noise stops.
+dontaudit kernel self:capability dac_override;

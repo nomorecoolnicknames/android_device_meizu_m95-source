@@ -1,0 +1,21 @@
+# m95 persistent boot logger (R/vendor).
+#
+# WHY: no UART on this device, USB bulk is flaky, ram_console keeps only the
+# kernel tail, and dropbox only records completed boots. A boot that hangs on
+# the animation leaves ZERO framework logs behind. This service streams all
+# logcat buffers to /cache (rotation 4x4MB, survives reboot, readable from
+# TWRP) starting at post-fs-data — early enough to catch system_server,
+# surfaceflinger and HAL crash loops, late enough that /cache is mounted
+# (fstab.mt6797 mounts it with wait,check before post-fs-data completes).
+# Runs under permissive bring-up; sepolicy narrowing comes with enforcing.
+# Disable by removing from PRODUCT_PACKAGES (no code depends on it).
+
+on post-fs-data
+    mkdir /cache/m95-bootlog 0770 system log
+    start m95_bootlog
+
+service m95_bootlog /system/bin/logcat -b all -v threadtime -f /cache/m95-bootlog/boot.txt -r 4096 -n 4
+    class late_start
+    user logd
+    group logd system
+    disabled

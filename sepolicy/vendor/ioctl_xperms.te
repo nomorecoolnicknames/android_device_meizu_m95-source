@@ -1,0 +1,254 @@
+# Socket ioctl extended permissions.
+#
+# ---------------------------------------------------------------------------
+# READ THIS FIRST: these rules are a local workaround, not the real fix.
+# ---------------------------------------------------------------------------
+# Every ioctl command whitelisted below is ALREADY whitelisted by the platform:
+#
+#   system/sepolicy/public/domain.te:268-270
+#     allowxperm domain domain:{ icmp_socket rawip_socket tcp_socket udp_socket }
+#       ioctl { unpriv_sock_ioctls unpriv_tty_ioctls };
+#     allowxperm domain domain:{ unix_dgram_socket unix_stream_socket }
+#       ioctl unpriv_unix_sock_ioctls;
+#
+#   public/ioctl_macros:45  unpriv_unix_sock_ioctls contains TIOCOUTQ
+#   public/ioctl_macros:~20 unpriv_sock_ioctls      contains SIOCGIFFLAGS,
+#                                                   SIOCGIFADDR, SIOCGIFINDEX
+#
+# That block is not inside any conditional (the nearest not_full_treble() opens
+# at domain.te:216 and closes at :218), the base `ioctl` permission is granted
+# (`rw_socket_perms` at public/global_macros:45 includes it), the kernel is at
+# policy version 30, and BOARD_SEPOLICY_VERS is unset. It should all apply.
+#
+# It demonstrably does not. FACT (live device, 2026-08-10) - denials for
+# commands that are in those macros, across SIX unrelated domains:
+#
+#   ioctlcmd=5411 (TIOCOUTQ)    system_server              unix_stream_socket
+#   ioctlcmd=5411 (TIOCOUTQ)    hal_wifi_supplicant_default unix_dgram_socket
+#   ioctlcmd=8913 (SIOCGIFFLAGS) init, netd, wificond,
+#                                hal_wifi_default,
+#                                hal_wifi_supplicant_default   udp_socket
+#   ioctlcmd=8914 (SIOCSIFFLAGS) init, hal_wifi_default        udp_socket
+#   ioctlcmd=8915 (SIOCGIFADDR)  netd                          udp_socket
+#   ioctlcmd=891b (SIOCGIFNETMASK) netd                        udp_socket
+#   ioctlcmd=8927 (SIOCGIFHWADDR) netd, hal_wifi_supplicant_default
+#                                                    udp_socket, packet_socket
+#   ioctlcmd=8933 (SIOCGIFINDEX)  netd, hal_wifi_supplicant_default
+#                                                    udp_socket, packet_socket
+#
+# Six domains failing on their platform-whitelisted defaults is not six bugs,
+# it is one: the `allowxperm domain domain:...` block is not reaching this
+# build's loaded policy. I could not establish why from the source tree, and it
+# is worth a proper investigation before enforcing - because netd and wificond
+# are in that list and neither is covered by the rules below, and because every
+# future domain will hit the same wall.
+#
+# The rules here cover only the domains that were actually observed failing on
+# a command they need. They are correct and narrow on their own terms, and if
+# the platform block is ever repaired they become harmless no-ops (xperm rules
+# are additive).
+#
+# Numeric literals rather than the TIOCOUTQ / SIOCGIF* macro names: those are
+# defined in system/sepolicy/public/ioctl_defines, and whether that file is in
+# the m4 include set for BOARD_SEPOLICY_DIRS could not be verified without a
+# build. Hex always compiles. Each is named in the comment beside it.
+
+##########################
+# TIOCOUTQ (0x5411) - "how many bytes are still queued for transmit on this
+# socket". A read-only query, on a socket the process owns (scontext ==
+# tcontext in both denials), taking no argument that can change kernel state.
+# It is in the platform's own unprivileged whitelist, which is the strongest
+# statement available that it is safe. Scoped to this one command rather than
+# granting the domains unrestricted ioctl.
+
+# FACT: avc: denied { ioctl } ... ioctlcmd=5411
+#       scontext=u:r:system_server:s0 tcontext=u:r:system_server:s0
+#       tclass=unix_stream_socket  permissive=1                       (x53)
+# Without it, under enforcing: whichever system_server component polls its own
+# socket backlog gets EACCES instead of a byte count. 53 hits in one boot means
+# it is on a live path, not an init-time probe.
+# REMOVED as redundant (sesearch): allowxperm system_server self:unix_stream_socket ioctl { 0x5411 };
+
+# FACT: avc: denied { ioctl } ... ioctlcmd=5411
+#       scontext=u:r:hal_wifi_supplicant_default:s0
+#       tcontext=u:r:hal_wifi_supplicant_default:s0
+#       tclass=unix_dgram_socket  permissive=1                       (x214)
+# 214 hits - this is wpa_supplicant's control-interface socket, which it drains
+# on every control message from wificond and the framework.
+# REMOVED as redundant (sesearch): allowxperm hal_wifi_supplicant_default self:unix_dgram_socket ioctl { 0x5411 };
+
+##########################
+# Interface-query ioctls for wpa_supplicant.
+#
+# These were NOT on the original defect list but are the same denial in the
+# same domain, and fixing only TIOCOUTQ would leave the supplicant broken
+# anyway: SIOCGIFFLAGS/SIOCGIFHWADDR/SIOCGIFINDEX are how it learns whether
+# wlan0 is up, what its MAC is, and what index to bind its packet socket to.
+# All three are read-only getters and all three are in the platform's
+# unpriv_sock_ioctls.
+#
+# FACT: ioctlcmd=8913/8927/8933, scontext == tcontext ==
+#       u:r:hal_wifi_supplicant_default:s0, tclass=udp_socket and
+#       tclass=packet_socket, permissive=1.
+#
+# Note packet_socket is not in the platform's allowxperm class list at all
+# (domain.te:268 covers icmp/rawip/tcp/udp only), so that half would need a
+# device rule even on a healthy build.
+#
+# Without them, under enforcing: wpa_supplicant cannot enumerate wlan0. It does
+# not crash - it fails to associate, which presents as "Wi-Fi just doesn't
+# connect" with no useful log once denials stop printing.
+allowxperm hal_wifi_supplicant_default self:udp_socket ioctl { 0x8913 0x8927 0x8933 };
+allowxperm hal_wifi_supplicant_default self:packet_socket ioctl { 0x8927 0x8933 };
+
+# netd's interface-query ioctls. Documented in the census at the top of this
+# file but no rule was ever written for them — verified after the flash, the
+# denials are still live:
+#   { ioctl } ioctlcmd=8913/8915/891b/8927 scontext=u:r:netd:s0
+#   tcontext=u:r:netd:s0 tclass=udp_socket permissive=1
+#
+# Why these matter more than most: under enforcing they split into two
+# failures and the quiet one is the dangerous one.
+#
+#   ifc_get_info() (system/core/libnetutils/ifc_utils.c:513,522) issues
+#   SIOCGIFNETMASK and SIOCGIFFLAGS, and it SWALLOWS a failed ioctl — it zeroes
+#   the field and still returns 0. So `interface getcfg` succeeds while
+#   reporting 0.0.0.0/0 with flags=0, and NetworkManagementService is told every
+#   interface is down and unaddressed. No error, no log, a confident wrong
+#   answer.
+#
+#   ifc_up() (ifc_utils.c:208) does SIOCGIFFLAGS before SIOCSIFFLAGS and returns
+#   -1 at the first step, so it never reaches the set. RouteController.cpp:679
+#   cannot bring an interface up when adding it to a network — that is the ccmni
+#   data interface and wlan0.
+#
+# All four are read-only queries on a socket netd owns (scontext == tcontext),
+# and AOSP already whitelists them for unprivileged domains in
+# public/ioctl_macros — this device needs them named explicitly because the
+# monolithic policy here does not pull that macro in for netd.
+# REMOVED as redundant (sesearch): allowxperm netd self:udp_socket ioctl { 0x8913 0x8915 0x891b 0x8927 0x8933 };
+
+##########################
+# THE BASE PERMISSIONS THE RULES ABOVE DEPEND ON — verified missing after a
+# flash, which is why two of them had no effect.
+#
+# FACT: after landing every allowxperm above and flashing, netd's denials went
+# to zero while these two persisted unchanged:
+#   ioctlcmd=5411 scontext=u:r:hal_wifi_supplicant_default:s0  x47
+#   ioctlcmd=5411 scontext=u:r:system_server:s0                x24
+#
+# The reason is that allowxperm does not GRANT anything. It narrows an ioctl
+# permission that must already be held, so a bare allowxperm with no matching
+# allow is inert - the access is refused on the `ioctl` permission itself and
+# the extended rule is never consulted. netd was fixed by the xperm alone
+# because the platform policy already grants it ioctl on udp_socket; these two
+# domains get their socket permissions from create_socket_perms macros, which
+# deliberately exclude ioctl.
+#
+# This is the fourth time today a rule has looked correct, compiled cleanly and
+# done nothing: the camera shading grant missing its /mnt hop, the mBack
+# overlay in the wrong resource package, dead policy behind an unreachable
+# path, and now these. Policy proves nothing until the whole chain it rests on
+# is checked - and the only reliable check is a flash and a fresh denial count.
+# REMOVED as redundant (sesearch): allow system_server self:unix_stream_socket ioctl;
+# REMOVED as redundant (sesearch): allow hal_wifi_supplicant_default self:unix_dgram_socket ioctl;
+
+# netd needs the base permission too — the same omission as the two above.
+#
+# FACT (grep over the compiled policy.conf): the platform ships
+# `allowxperm netd self:udp_socket ioctl { ... }` at line 19022, a command set
+# covering qualcomm rmnet and friends — but there is NO
+# `allow netd self:udp_socket ... ioctl` anywhere in the policy. Searching for
+# it returns nothing.
+#
+# So netd was never in a different situation from system_server and the
+# supplicant HAL, and the explanation I invented for why it behaved differently
+# was explaining an observation that did not exist. All three lacked the base
+# permission; only the command sets were ever declared. That also explains why
+# adding base allows for the other two changed nothing visible on the last
+# flash - netd's denials, which dominate the count, were untouched.
+# REMOVED as redundant (sesearch): allow netd self:udp_socket ioctl;
+
+
+##########################
+# THE ONLY RULE THIS FILE ACTUALLY NEEDS.
+#
+# Everything above is commented out because sesearch against the policy pulled
+# off the device - byte-identical to the build artifact - showed the platform
+# already grants it all:
+#   allow netd netd:udp_socket { ... ioctl ... };
+#   allowxperm domain domain:udp_socket ioctl { ... 0x8913 0x8915 0x891b
+#                                                0x8933 ... 0x540e-0x5411 ... };
+# netd is a type with no attributes, so `self` was expanding correctly; the
+# rules were simply unnecessary. Four build cycles were spent adding permissions
+# that already existed.
+#
+# 0x8927 (SIOCGIFHWADDR) is the one observed command genuinely absent from the
+# platform's set. netd reads interface hardware addresses through
+# ifc_get_hwaddr() (system/core/libnetutils/ifc_utils.c:183), reached from
+# CommandListener.cpp:173.
+#
+# Scope note, so nobody inherits my overstatement: every denial in this family
+# lands in the first two minutes after boot and stops on its own (first at
+# +18s, last at +2min, then seven minutes clean). Under enforcing this costs
+# that startup window, not steady-state operation. It is worth fixing and it is
+# not a blocker.
+allowxperm netd self:udp_socket ioctl { 0x8927 };
+
+##########################
+# 2026-08-14: THE MYSTERY AT THE TOP OF THIS FILE IS SOLVED.
+#
+# "Six domains failing on their platform-whitelisted defaults is not six
+# bugs, it is one" — correct, and the one bug is in the KERNEL, not in the
+# policy build. The header's hypothesis (the allowxperm block "not reaching
+# this build's loaded policy") is REJECTED:
+#
+# FACT (sesearch over /sepolicy pulled off the running device, 2026-08-14 —
+# the exact file monolithic init loads): every observed command is granted.
+#   allowxperm domain domain:udp_socket ioctl { ... 0x8913 0x8915 0x891b
+#       0x8933 ... 0x540e-0x5411 ... };
+#   allowxperm netd netd:udp_socket ioctl { ... 0x8922-0x8927 ... };
+#   allowxperm hal_wifi_supplicant_default ... udp/packet sets incl. 0x8927;
+#   allow netd netd:udp_socket { ... ioctl ... };  (base perms all present)
+#
+# FACT (same day, fresh boot, captures/m95-sepolicy-20260814/): the very same
+# commands are still audited as denials on every call — netd x478,
+# wpa_supplicant x330, system_server x65, rild x10 — and NOT only in a boot
+# window: bursts recur at uptime 9-10 min with every Wi-Fi reconnect. The
+# earlier "startup window, not a blocker" scope note is WITHDRAWN.
+#
+# ROOT CAUSE, FACT (kernel/m685/security/selinux, read 2026-08-14): this
+# 3.18 kernel carries the pre-upstream Android "operations" backport. The
+# bring-up patch that let it LOAD Android 9 policy (policydb v30) taught
+# avtab_read_item() the new on-disk entry layout — u.ops->type receives the
+# v30 `specified` selector byte (0x01 function / 0x02 driver) and
+# u.ops->driver the driver byte — but the DECISION code still treated
+# u.ops->type as the driver byte:
+#   services_compute_operation_type() flagged driver 0x01/0x02 instead of
+#     0x89/0x54, so avc_has_operation() finds the real driver unflagged and
+#     takes `avd.allowed &= ~requested` — deny, audit, every call;
+#   services_compute_operation_num() compared od->type (real driver) against
+#     the selector and returned before accumulating any allowed bits.
+# Net effect: ANY (source, target, class) pair that has at least one
+# allowxperm rule is deny-ALL-ioctls under enforcing, regardless of what the
+# rule allows. That is netd, wpa_supplicant, system_server, rild, hal_wifi,
+# and every fsck TCGETS on the console — networking and telephony would die
+# at the first ioctl.
+#
+# FIX: kernel/m685/security/selinux/ss/{avtab.h,services.c} now dispatch on
+# the v30 selector (patch record in tools/patches/, same tree this comment
+# ships in). NOT YET BUILT OR FLASHED as of this writing — until a boot.img
+# with that fix is verified, this defect is enforcing blocker #1.
+#
+# VERIFICATION for the first capture after that flash:
+#   adb logcat -b all -d | grep -c 'ioctlcmd=5411'   -> expect 0
+#   adb logcat -b all -d | grep -c 'scontext=u:r:netd.*ioctlcmd' -> expect 0
+#   Wi-Fi assoc + mobile data attach still working (proves allowed sets are
+#   honoured, not merely silenced).
+#
+# COROLLARY for rule-writing until then: do NOT add allowxperm rules to this
+# tree. A pair with no xperm entries keeps unrestricted ioctl once the base
+# permission is granted; adding a filter arms the kernel defect and turns
+# the pair into deny-all. The 0x8927 netd rule above predates this finding
+# and stays only because netd's pair is already armed by the platform's own
+# xperm sets either way; it becomes correct the moment the kernel fix lands.

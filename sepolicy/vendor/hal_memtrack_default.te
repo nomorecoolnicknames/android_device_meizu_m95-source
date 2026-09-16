@@ -1,0 +1,90 @@
+# android.hardware.memtrack@1.0-service with memtrack.mt6797.so.
+#
+# ---------------------------------------------------------------------------
+# DELIBERATELY LEFT DENIED. This file intentionally contains no allow rule.
+# ---------------------------------------------------------------------------
+#
+# FACT (live device, 2026-08-10), fires on every stats poll:
+#   avc: denied { read open getattr } for
+#        path="/sys/kernel/debug/mali0/gpu_memory"
+#        scontext=u:r:hal_memtrack_default:s0 tcontext=u:object_r:debugfs:s0
+#        tclass=file  permissive=1                                     (x52)
+#   avc: denied { read open } for path="/sys/kernel/debug/ion/clients"
+#        scontext=u:r:hal_memtrack_default:s0 tcontext=u:object_r:debugfs:s0
+#        tclass=dir  permissive=1
+#
+# FACT: debugfs IS mounted on this build. /proc/mounts carries
+#   debugfs /sys/kernel/debug debugfs rw,seclabel,relatime 0 0
+# put there on purpose by rootdir/init.mt6797.rc:38 (`mount debugfs debugfs
+# /sys/kernel/debug` at early-init), whose own comment names this HAL as one of
+# the two reasons it was restored. Both nodes exist and are u:object_r:debugfs:s0
+# (verified with ls -ldZ).
+#
+# FACT: the blob really does want them. `strings /vendor/lib64/hw/memtrack.mt6797.so`
+# contains "/d/ion/clients/", "/d/ion/clients/%s", "/sys/kernel/debug/mali0/gpu_memory",
+# "ion_mm_heap", "ion_mm_heap_for_camera", and the error string
+# "%s error to open /sys/kernel/debug/ion/clients/%d: %s" — i.e. the failure is
+# a logged branch in the blob, not a crash.
+#
+# WHAT ACTUALLY BREAKS UNDER ENFORCING: a number in `dumpsys meminfo`, and
+# nothing else. The whole chain swallows the error by design:
+#   - hardware/interfaces/memtrack/1.0/default/Memtrack.cpp:41-72 —
+#     getMemory() calls _hidl_cb(MemtrackStatus::SUCCESS, records) on EVERY
+#     path. When mModule->getMemory returns non-zero it simply returns an empty
+#     records vector, still tagged SUCCESS.
+#   - the only consumer is frameworks/base/core/jni/android_os_Debug.cpp:200
+#     read_memtrack_memory(), which on error does ALOGW("failed to get memory
+#     consumption info: %d") and returns. Nothing retries, nothing fails.
+# So the observable consequence is that the Graphics/GL lines of `dumpsys
+# meminfo` and procstats read 0. No allocation fails, no process is affected,
+# no frame is dropped.
+#
+# WHY NO RULE: debugfs is a whole-kernel debug surface under one label —
+# wakeup_sources, tracing, the ION client dump, the Mali allocator dump, every
+# driver's private files. There is no genfscon that can carve
+# /sys/kernel/debug/mali0/gpu_memory out of it, because debugfs is labelled by
+# its mount and genfscon on debugfs would re-type whole subtrees, so the
+# narrowest workable rule here is still `allow hal_memtrack_default debugfs:file
+# r_file_perms` — a HAL gets read of the entire kernel debug filesystem. AOSP's
+# own position is the same: private/domain.te dontaudits debugfs access for
+# coredomain precisely because it is expected to be absent, and public/
+# hal_memtrack.te grants nothing beyond binder.
+#
+# Opening debugfs to a HAL to repair a dumpsys statistic is a bad trade. Left
+# denied. Under enforcing the reads fail, the blob takes its logged error
+# branch, memtrack reports empty, and that is the correct outcome.
+#
+# Separately worth knowing (not a sepolicy issue): init.mt6797.rc:38 mounts
+# debugfs at early-init on a user-facing build largely for this HAL and for
+# KernelWakelockReader. If the wakelock reader turns out not to need it either,
+# the mount itself is the thing to remove, not the label.
+#
+# REVISIT IF: someone shows a real regression that is not a statistic — e.g.
+# lowmemorykiller or the framework's memory-pressure logic consuming
+# memtrack_proc_graphics_pss() and changing behaviour when it reads 0. On this
+# tree it does not: android_os_Debug.cpp is the only caller.
+#
+# ---------------------------------------------------------------------------
+# ADDENDUM (core-domain sweep, same day): the decision above is not merely the
+# better trade — the rule it declines to write is NOT AVAILABLE. It would fail
+# the build.
+#
+# FACT, system/sepolicy/public/domain.te:1310-1316, verbatim:
+#   # Do not allow access to the generic debugfs label. This is too broad.
+#   # Instead, if access to part of debugfs is desired, it should have a
+#   # more specific label.
+#   # TODO: fix system_server and dumpstate
+#   neverallow { domain -init -vendor_init -system_server -dumpstate }
+#       debugfs:file no_rw_file_perms;
+#
+# hal_memtrack_default is not on that exemption list, and unlike the
+# coredomain debugfs neverallow in private/domain.te:57-61 this one sits in
+# public/ outside any full_treble_only()/not_full_treble() guard, so it applies
+# to this build regardless of ro.treble.enabled (which is false here). Anyone
+# who later "just adds the allow rule" gets a neverallow failure out of
+# checkpolicy, not a working gpu_memory read.
+#
+# That also settles the shape of any future fix: it must be a specific type via
+# genfscon, exactly as the AOSP comment says, or nothing. Since genfscon on
+# debugfs would re-type whole subtrees (see WHY NO RULE above), nothing is the
+# answer this device should keep.

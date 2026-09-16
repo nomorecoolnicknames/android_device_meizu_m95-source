@@ -1,0 +1,259 @@
+# camera.mt6797 inside camera.provider@2.4-service.
+# Node names [DEV] (ueventd/kernel); which ones the blob opens is [CONV].
+
+allow hal_camera_default camera_isp_device:chr_file rw_file_perms;
+allow hal_camera_default camera_device:chr_file rw_file_perms;
+allow hal_camera_default cam_cal_device:chr_file rw_file_perms;
+allow hal_camera_default video_device:chr_file rw_file_perms;
+allow hal_camera_default MTK_SMI_device:chr_file rw_file_perms;
+# /dev/devmap — devinfo (efuse) read-only map. [FACT 2026-08-18, log-audit]
+# libcam.halsensor.so (SeninfDrvImp::init, string offset 0x50cc4 in the blob)
+# opens it on every camera open to read chip data ("Get Devinfo Data") and
+# logged "E SeninfDrvImp: [init]Err(241):/dev/devmap kernel open fail,
+# errno(13)" per session; the blob then falls back to defaults. Read-only on
+# purpose — the node has nothing writable. Pairs with the ueventd rule
+# (0440 system camera) and the devmap_device label in file_contexts.
+allow hal_camera_default devmap_device:chr_file r_file_perms;
+allow hal_camera_default mtk_m4u_proc:file rw_file_perms;
+# sensor/lens calibration lives in NV data [CONV: standard MTK layout]
+r_dir_file(hal_camera_default, nvdata_file)
+allow hal_camera_default sysfs:file r_file_perms;
+
+# IMapper is a same_process_hwservice (passthrough); the provider has to look it
+# up to wrap preview/gralloc buffers. AOSP hal_camera.te grants only
+# "hal_graphics_allocator:fd use" (system/sepolicy/public/hal_camera.te:14), not
+# the mapper lookup. Observed denial (SELinux is still Permissive, so this is
+# latent, not a current blocker):
+#   avc: denied { find } for interface=android.hardware.graphics.mapper::IMapper
+#   sid=u:r:hal_camera_default:s0 pid=365
+#   tcontext=u:object_r:hal_graphics_mapper_hwservice:s0 permissive=1
+# -- <original-home>/m95-boot-ok.txt, 08-09 08:55:18.083
+# Type is defined at system/sepolicy/public/hwservice.te:25.
+allow hal_camera_default hal_graphics_mapper_hwservice:hwservice_manager find;
+
+##########################
+# Lens-shading (LSC) calibration cache — /sdcard/shading.
+#
+# FACT (blob strings, live device 2026-08-10): /vendor/lib64/libcam.hal3a.v3.so
+# carries these path literals, and libmtkcam_cct.so carries the same set:
+#   /sdcard/shading
+#   /sdcard/shading/sensor_%d_cap_%d_%dx%d_%dx%d.log
+#   /sdcard/shading/sensor_%d_align_cap_%d_%dx%d_%dx%d.log
+#   /sdcard/shading/sensor_%d_trfm_%d_%d.log
+#   /sdcard/shading_otp/{%d_golden_%dx%d_%d.otp,%d_unit_%dx%d_%d.otp}
+# The consumer is NSIspTuning::LscMgrDefault (doShadingAlign / doShadingTrfm /
+# getDebugInfo are exported from the same .so).
+#
+# FACT (live device): the directory and a populated cache already exist —
+#   /storage/emulated/0/shading  drwxrwx--x root sdcard_rw u:object_r:sdcardfs:s0
+#   24 x sensor_1_{,align_}cap_*_17x17_4032x3016.log, 54272 bytes each
+# left behind by the Flyme stock ROM. So this is a real, working MTK feature,
+# not a debug dump — the port has simply never been able to reach it.
+#
+# FACT (commit 3f80745): the DAC half is fixed. The provider rc now runs with
+# `group audio camera input drmrpc sdcard_rw media_rw`; before that every blob
+# write to /sdcard died with EACCES and lsc_mgr could not even mkdir the
+# directory, which is why lens-shading calibration has never persisted on this
+# port and only just started working.
+#
+# This is the SELinux half. Under enforcing the DAC fix alone is not enough.
+#
+# Path walk, each hop verified with `ls -ldZ` on the live device:
+#   /sdcard                -> symlink, u:object_r:rootfs:s0
+#                             (no rule: public/domain.te:56 already grants
+#                              `allow domain rootfs:lnk_file { read getattr }`)
+#   /storage, /storage/self          dir     storage_file
+#   /storage/self/primary            symlink storage_file  -> /mnt/user/0/primary
+#   /mnt/user, /mnt/user/0           dir     mnt_user_file
+#   /mnt/user/0/primary              symlink mnt_user_file -> /storage/emulated/0
+#   /storage/emulated/0[/shading]    dir     sdcardfs   (mount label, mlstrustedobject)
+#
+# Why the target is the generic `sdcardfs` and not a dedicated type: sdcardfs
+# gets its label from the mount, not from file_contexts —
+#   /proc/mounts: /data/media /storage/emulated sdcardfs rw,...,multiuser
+# — so every inode under it carries one single type and a subdirectory cannot
+# be given a narrower one. The narrowing that IS available was done instead:
+# the permission set below is traverse + create + write only. No rmdir, no
+# remove_name, no unlink, no rename: the cache is written and overwritten in
+# place under fixed filenames, and the camera HAL has no business deleting
+# anything on the user's storage. FALSIFIER if that is too tight: a
+# "Permission denied" on unlink from lsc_mgr — then add remove_name/unlink as
+# a pair, never one without the other.
+#
+# Without these rules, under enforcing: the calibration write fails, the cache
+# never persists, and LSC is recomputed from scratch every camera open. The
+# preview still comes up, so it presents as vignetting/colour-shading that
+# varies between sessions with nothing in the log to explain it — the same
+# invisible-under-permissive class as the Goodix netlink socket (38ae370) and
+# the akmd_set.txt compass store (e9890f4).
+#
+# No neverallow blocks this: AOSP public/hal_camera.te has no sdcard_type
+# clause, and the sdcard_type neverallows that do exist name surfaceflinger,
+# system_server, isolated_app, ephemeral_app and the wifi HALs — not
+# hal_camera_server (checked against system/sepolicy on the build tree).
+allow hal_camera_default storage_file:dir search;
+allow hal_camera_default storage_file:lnk_file read;
+allow hal_camera_default mnt_user_file:dir search;
+allow hal_camera_default mnt_user_file:lnk_file read;
+allow hal_camera_default sdcardfs:dir { create search getattr open read write add_name };
+allow hal_camera_default sdcardfs:file { create open read write append getattr setattr lock };
+
+##########################
+# SensorService event channel — 3A and EIS lose their gyro/accel feed without it.
+#
+# FACT (live device, 2026-08-10 12:14:17.640, camera preview open):
+#   avc: denied { read } for comm="Mtkcam@SensorLi"
+#        scontext=u:r:hal_camera_default:s0 tcontext=u:r:system_server:s0
+#        tclass=unix_stream_socket permissive=1
+#
+# FACT: frameworks/native/libs/gui/BitTube.cpp:49 creates the channel with
+#   socketpair(AF_UNIX, SOCK_SEQPACKET, 0, sockets)
+# and SELinux classes AF_UNIX/SOCK_SEQPACKET as unix_stream_socket. The tube is
+# constructed inside system_server — sensorservice/SensorEventConnection.cpp:38
+# `mChannel = new BitTube(mService->mSocketBufferSize)` — so the socket's
+# creator SID is system_server, which is exactly the tcontext above.
+#
+# FACT: the consumer is MediaTek's own sensor listener, not AOSP glue. The
+# symbols _ZN7android16SensorEventQueue4readEP12ASensorEventm and
+# SensorListenerImp::enableSensor(SensorListener::SensorTypeEnum, unsigned) are
+# exported from /vendor/lib64/libmtkcam_sysutils.so, and `SensorListener` also
+# appears in libcam.hal3a.v3.so (3A) and libfeature_eis.so (EIS). The thread
+# name in the denial, Mtkcam@SensorLi, is that listener's thread.
+#
+# FACT: AOSP grants this to apps only — public/app.te:59
+#   allow appdomain system_server:unix_stream_socket { read write setopt getattr getopt shutdown };
+# No HAL domain has it, and public/hal_camera.te has no equivalent.
+#
+# `read` is the recv(2) side only. `write` is deliberately NOT granted: the
+# reverse direction on a BitTube is the wake-up-sensor ack, and the camera's
+# listener enables ACCELEROMETER/GYROSCOPE, which are non-wakeup. FALSIFIER: a
+# denial for { write } on the same tclass/tcontext from comm="Mtkcam@SensorLi".
+#
+# `fd use` is INFERENCE, not an observed denial. SensorEventConnection hands the
+# channel over binder — BitTube.cpp:116 `reply->writeDupFileDescriptor(mReceiveFd)`
+# — and selinux_binder_transfer_file() checks FD__USE between the receiving
+# domain and the SID that created the file before it ever checks the socket
+# perms. Nothing in AOSP grants hal_camera system_server:fd (grepped: hal_camera.te
+# has appdomain, surfaceflinger, hal_allocator_server, hal_graphics_allocator —
+# not system_server, unlike hal_graphics_composer.te:21 which does). It did not
+# appear in the capture, but that capture ran with audit_rate_limit=5 and lost
+# ~3200 records, and a one-shot transfer check is precisely what gets dropped.
+# Granting only `read` would leave the path broken under enforcing with no
+# denial left to explain it, which is the failure mode this sweep exists to
+# prevent. FALSIFIER: dump the loaded policy and
+# `sesearch --allow -s hal_camera_default -t system_server -c fd`.
+#
+# Without these, under enforcing: the camera HAL registers its sensor listener,
+# gets a channel, and then reads nothing from it forever. 3A and EIS keep
+# running on a stale/zero motion vector — no crash, no log, just worse
+# stabilisation and worse convergence.
+allow hal_camera_default system_server:fd use;
+allow hal_camera_default system_server:unix_stream_socket read;
+
+# The missing hop, found by adversarial review of the block above.
+#
+# Without this the whole /sdcard/shading grant is dead code. The traversal is
+# /storage/self/primary -> /mnt/user/0/primary -> /storage/emulated/0, and the
+# rules above cover storage_file and mnt_user_file — but not the directory that
+# sits between them.
+#
+# FACT (live device, ls -ldZ, 2026-08-10):
+#   /mnt                    drwxr-xr-x  u:object_r:tmpfs:s0
+#   /mnt/user, /mnt/user/0  drwxr-x--x  u:object_r:mnt_user_file:s0
+# /mnt itself is tmpfs, not mnt_user_file. Resolving /mnt/user/0/primary needs
+# search on every component, so a denial on /mnt alone stops the walk before
+# mnt_user_file is ever reached and the lens-shading cache stays unwritable.
+#
+# `search` on a directory type is traversal only — no read of the directory's
+# contents, no access to anything else living on tmpfs. It is the narrowest
+# permission that makes the path resolvable, and AOSP grants exactly this to
+# domains that reach emulated storage.
+allow hal_camera_default tmpfs:dir search;
+
+##########################
+# 2026-08-14 census additions (captures/m95-sepolicy-20260814/).
+
+# MDP/GED proc nodes: FACT { ioctl } /proc/mtk_cmdq 0x7805 (comm MDP-0, x6)
+# and /proc/ged 0x6767 (x4). Types in file.te; no allowxperm on purpose —
+# kernel xperm defect, see ioctl_xperms.te.
+allow hal_camera_default proc_ged:file r_file_perms;
+allow hal_camera_default proc_cmdq:file r_file_perms;
+
+# Sensor/lens calibration under /nvcfg: FACT { read open getattr }
+# /nvcfg/camera/nv_lens_main + nv_version_main (provider@2.4-se). Read-only:
+# the provider consumes factory calibration, it does not write it.
+r_dir_file(hal_camera_default, nvcfg_file)
+
+# NVRAM readiness property: FACT { read open getattr } on the nvram_prop
+# property page (comm android.hardwar). Same dependency rild already has.
+get_prop(hal_camera_default, nvram_prop)
+
+# Framework binder round-trip. This device is not Treble
+# (ro.treble.enabled=false) and the MTK provider talks to the framework
+# servicemanager directly. FACT: { call } to servicemanager (x1,
+# provider@2.4-se), { find } on sensorservice_service (3A/EIS gyro feed),
+# { find } on the MTK GuiExt service (fell through to
+# default_android_service before service_contexts labelled it), and { find }
+# on hal_graphics_allocator_hwservice (the provider wraps gralloc buffers;
+# base hal_camera.te grants only the mapper, which this file already added).
+binder_call(hal_camera_default, servicemanager)
+allow hal_camera_default sensorservice_service:service_manager find;
+allow hal_camera_default guiext_service:service_manager find;
+# R-SPLIT: raw find violates hal_graphics_allocator.te neverallow; the
+# sanctioned form is hal_client_domain (keeps find + binder call legal).
+hal_client_domain(hal_camera_default, hal_graphics_allocator)
+
+##########################
+# The call that goes with that find. FIRST DENIAL EVER OBSERVED UNDER
+# permissive=0, and the one that actually stops the camera.
+#
+# FACT (live device, 2026-08-15 22:50:40, enforcing):
+#   avc: denied { call } for pid=745 comm="HwBinder:371_1"
+#        scontext=u:r:hal_camera_default:s0
+#        tcontext=u:r:hal_graphics_allocator_default:s0
+#        tclass=binder permissive=0
+# and 0.2 s later, provider@2.4-service:
+#   F DEBUG : Abort message: 'gralloc-alloc is missing'
+#
+# The block above grants { find } on hal_graphics_allocator_hwservice, so the
+# provider locates IAllocator and then cannot invoke it: hwservice_manager
+# find is the lookup, binder call is the transaction, and they are separate
+# checks. The provider treats a failed IAllocator::allocate as fatal rather
+# than falling back, so this single missing rule is the whole difference
+# between a working camera and an aborting provider under enforcing.
+#
+# Why it was invisible before: under permissive the call succeeds and the
+# audit line is one { call } among thousands. It only becomes a blocker at
+# permissive=0. Same latent class as the mapper find above.
+binder_call(hal_camera_default, hal_graphics_allocator_default)
+
+##########################
+# Second enforcing-only blocker, found after the gralloc one was fixed.
+#
+# FACT (live device, 2026-08-15 23:07:09, enforcing):
+#   avc: denied { call } for pid=3254 comm="AFthread"
+#        scontext=u:r:hal_camera_default:s0 tcontext=u:r:system_server:s0
+#        tclass=binder permissive=0
+#   F libc : Fatal signal 11 (SIGSEGV), fault addr 0x10 in tid 3254 (AFthread)
+#
+# Fault address 0x10 is a field offset off a null base: the binder call is
+# refused, the caller gets a null interface back and dereferences it without
+# checking. Same shape as the gralloc abort above, different service.
+#
+# The target is system_server because this device is not Treble
+# (ro.treble.enabled=false) and sensorservice runs inside system_server, so
+# the 3A/AF motion feed is a binder round-trip into it. The block above
+# already grants the pieces around the call — sensorservice_service find,
+# system_server:fd use, and the BitTube unix_stream_socket read — but not the
+# transaction itself, so AF got as far as looking the service up and then died
+# on the first invocation.
+binder_call(hal_camera_default, system_server)
+
+# MDP thread talks to the property service. FACT (enforcing, 2026-08-15 23:19):
+#   avc: denied { write } comm="MDP-0" name="property_service"
+#        scontext=u:r:hal_camera_default:s0 tcontext=u:object_r:property_socket:s0
+#        tclass=sock_file permissive=0
+# Non-fatal — the capture completed anyway — but the property never takes
+# effect. This grants the socket connect; whichever property it then sets will
+# surface as its own { set } denial and gets a labelled type, never default_prop.
+unix_socket_connect(hal_camera_default, property, init)

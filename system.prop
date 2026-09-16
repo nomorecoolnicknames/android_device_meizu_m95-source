@@ -1,0 +1,8 @@
+# system.prop — Meizu MX6 (m95) on LineageOS 18.1. System-side properties.
+# StrictMode off for system processes (userdebug WTF dialog covered the
+# screen every boot — FACT, LOS16 tree).
+persist.sys.strictmode.disable=true
+
+# Force framework VoLTE-available gate for bring-up (phh/GSI override;
+# forces OUR side only, not the network — FACT, LOS16 tree).
+persist.dbg.volte_avail_ovr=1

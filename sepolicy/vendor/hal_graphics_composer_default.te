@@ -1,0 +1,27 @@
+# android.hardware.graphics.composer@2.1-service — device extras.
+
+# Display hotplug / vsync uevent listener.
+#
+# FACT (live device, 2026-08-10):
+#   avc: denied { read } for comm="UEventThreadHWC"
+#        scontext=u:r:hal_graphics_composer_default:s0
+#        tcontext=u:r:hal_graphics_composer_default:s0
+#        tclass=netlink_kobject_uevent_socket  permissive=1           (x28)
+#
+# The thread name is the giveaway: this is SurfaceFlinger's HWC uevent thread
+# inside the composer process, sitting on the kernel uevent netlink socket
+# waiting for display change/hotplug notifications.
+#
+# AOSP does not cover it: system/sepolicy/public/hal_graphics_composer.te has
+# no netlink_kobject_uevent_socket rule at all (grepped). Only `read` was
+# denied, so create/bind are evidently already reachable, but the whole set is
+# granted here because a listener that can create and bind but not read is a
+# state no caller can recover from, and the four permissions are meaningless
+# apart.
+#
+# Without it, under enforcing: the composer opens the socket and then blocks
+# forever on a read it is not allowed to make. Display hotplug and any
+# HWC-driven mode change stop being noticed. On a fixed-panel phone that is
+# survivable day to day, which is exactly why it would go unnoticed - it
+# surfaces as SurfaceFlinger missing a state change it should have seen.
+allow hal_graphics_composer_default self:netlink_kobject_uevent_socket { create bind read setopt };

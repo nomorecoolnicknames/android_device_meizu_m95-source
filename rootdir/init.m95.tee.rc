@@ -1,0 +1,53 @@
+# init.m95.tee.rc — Trustonic <t-base TEE driver daemon (mcDriverDaemon,
+# sepolicy domain mcd). Needed by the mt6797 keymaster/gatekeeper blobs and
+# the Goodix fingerprint stack.
+#
+# Runtime registry: mcDriverDaemon uses /data/misc/mcRegistry (+ TbStorage)
+# [FACT: strings on vendor/bin/mcDriverDaemon]. The file_contexts gap first
+# reported in INIT_SERVICES.md is CLOSED 2026-08-14: sepolicy/file_contexts
+# now labels /data/misc/mcRegistry(/.*)? as mcd_data_file, and the
+# post-fs-data restorecon below relabels the tree that already exists on
+# devices (FACT, 2026-08-14 census: live tree was system_data_file throughout
+# and mcd's TbStorage reads/writes were all denials against that label).
+#
+# Stock also exports MC_AUTH_TOKEN_PATH=/efs — m95 has no efs partition
+# (DEVICE_FACTS partition table), so that line is deliberately not ported.
+
+on fs
+    # Queued after init.mt6797.rc's "on fs" mount_all (imported files parse
+    # after the importing file), matching stock's early TEE start.
+    # [DEV: stock init.trustonic.rc:15-21]
+    # 2026-08-05: WITHOUT these chmod/chown the source-kernel boot's
+    # mcDriverDaemon (user system, group system) cannot open /dev/mobicore
+    # (ueventd default root:root 0600; no DEVTMPFS in this kernel) and dies
+    # before binding its netlink socket -> in-kernel mc_open_device returns
+    # MC_DRV_ERR_DAEMON_UNREACHABLE (15) -> TEE sessions never open.
+    # Ported from stock init.trustonic.rc [DEV].
+    chmod 0600 /dev/mobicore
+    chown system system /dev/mobicore
+    chmod 0666 /dev/mobicore-user
+    chown system system /dev/mobicore-user
+    mkdir /data/misc/mcRegistry 0775 system system
+    mkdir /data/misc/mcRegistry/TbStorage 0775 system system
+    start mobicore
+
+on post-fs-data
+    # Re-run for the first boot after a /data wipe (on fs may have run before
+    # /data carried a filesystem worth keeping). mkdir is a no-op if present.
+    mkdir /data/misc/mcRegistry 0775 system system
+    mkdir /data/misc/mcRegistry/TbStorage 0775 system system
+    # Existing installs created this tree before file_contexts labelled it
+    # (system_data_file throughout, 2026-08-14 census) — relabel in place so
+    # tee.te's mcd_data_file rules actually cover the store mcd uses.
+    restorecon_recursive /data/misc/mcRegistry
+
+# Secure-driver args = stock cmdline MINUS 020b...drbin: that file does not
+# exist in our blob tree NOR in the stock Flyme 8 system image (stock init
+# referenced a nonexistent file). The four remaining .drbin are verified
+# present in proprietary/vendor/app/mcRegistry. [DEV: stock
+# init.trustonic.rc:50-55]
+service mobicore /vendor/bin/mcDriverDaemon -r /vendor/app/mcRegistry/020f0000000000000000000000000000.drbin -r /vendor/app/mcRegistry/05120000000000000000000000000000.drbin -r /vendor/app/mcRegistry/070b0000000000000000000000000000.drbin -r /vendor/app/mcRegistry/05070000000000000000000000000000.drbin
+    class core
+    user system
+    group system
+    oneshot

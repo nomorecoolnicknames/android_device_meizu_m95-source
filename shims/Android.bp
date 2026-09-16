@@ -1,0 +1,228 @@
+// m95 vendor shims (phase 1). Built as vendor_shared_lib, installed to
+// /vendor/lib{,64} via PRODUCT_PACKAGES in phase 2 (device.mk) together
+// with TARGET_LD_SHIM_LIBS entries. See VENDOR_A11_BLOB_AUDIT.md for the
+// per-symbol evidence (UND -> provider mapping from Ghidra + readelf).
+cc_defaults {
+    name: "m95shim_defaults",
+    vendor: true,
+    cflags: ["-Wno-unused-parameter"],
+}
+
+cc_library_shared {
+    name: "libm95shim_gui",
+    defaults: ["m95shim_defaults"],
+    srcs: ["gui.cpp"],
+    // No shared_libs: both symbols declared manually and resolved at
+    // runtime under VNDK-lite (see gui.cpp). Linking system libgui here
+    // is a build-time VNDK violation.
+    allow_undefined_symbols: true,
+}
+
+cc_library_shared {
+    name: "libm95shim_power",
+    defaults: ["m95shim_defaults"],
+    srcs: ["power.cpp"],
+}
+
+cc_library_shared {
+    name: "libm95shim_audioutils",
+    defaults: ["m95shim_defaults"],
+    srcs: ["audioutils.cpp"],
+    // String8::String8() resolved from the system libutils at runtime (lite).
+    allow_undefined_symbols: true,
+}
+
+cc_library_shared {
+    name: "libm95shim_ui",
+    defaults: ["m95shim_defaults"],
+    srcs: ["ui.cpp"],
+    // Manual declarations only (see gui.cpp): N-ABI entries defined here,
+    // R-ABI targets resolved at runtime under VNDK-lite.
+    allow_undefined_symbols: true,
+}
+
+cc_library_shared {
+    name: "libm95shim_utils",
+    defaults: ["m95shim_defaults"],
+    srcs: ["utils.cpp"],
+    // MemoryHeapBase forwarders resolve R libbinder ctors at runtime (lite).
+    allow_undefined_symbols: true,
+}
+
+cc_library_shared {
+    name: "libm95shim_sf",
+    defaults: ["m95shim_defaults"],
+    srcs: ["sf.cpp"],
+}
+
+// N-layout android::Region for the Mali EGL driver (see region.cpp). Mali's
+// libui.so DT_NEEDED is redirected to this library by wire-shims.py.
+cc_library_shared {
+    name: "libm95shim_region",
+    defaults: ["m95shim_defaults"],
+    srcs: ["region.cpp"],
+    header_libs: ["libutils_headers", "liblog_headers"],
+    shared_libs: ["liblog"],
+    cflags: ["-fvisibility=hidden"],
+}
+
+cc_library_shared {
+    name: "libm95shim_net",
+    defaults: ["m95shim_defaults"],
+    srcs: ["net.c"],
+}
+
+// libm95probe is NOT linked by anything at build time; blobs get it via
+// patchelf --add-needed (vendor-18.1/wire-shims.py). Loaded for its
+// constructor side effect only (dlopen proof without logd).
+cc_library_shared {
+    name: "libm95probe",
+    defaults: ["m95shim_defaults"],
+    srcs: ["probe.c"],
+}
+
+// libm95trace is a MANUAL diagnostic (LD_PRELOAD tracer), never installed
+// to images and never in PRODUCT_PACKAGES. Build with `m libm95trace`,
+// push the .so to /cache, run services with LD_PRELOAD from TWRP.
+cc_library_shared {
+    name: "libm95trace",
+    defaults: ["m95shim_defaults"],
+    srcs: ["trace.c"],
+    shared_libs: ["libdl"],
+}
+
+// ---- ports of the LOS16 device shims (los/device/meizu/m95/shims), 2026-09-06.
+// Same blobs, same holes; R only widened them (libnetutils lost
+// ifc_set_throttle, BoringSSL lost SSLv3). `stem` keeps the DT_NEEDED / dlopen
+// filename the blob expects while the Soong module name stays unique
+// (libfs_mgr / libskia are taken by static modules in R).
+
+// libfs_mgr.so — N-layout fstab reader for libnvram.so (32+64). Without it
+// nvram_daemon, ccci_mdinit/ccci_fsd (modem), mnld, nvram_agent_binder and the
+// camera closure cannot load ("library libfs_mgr.so not found").
+cc_library_shared {
+    name: "libm95shim_fs_mgr",
+    defaults: ["m95shim_defaults"],
+    stem: "libfs_mgr",
+    srcs: ["fs_mgr.c"],
+}
+
+// libskia.so — empty DT_NEEDED placebo for libcam.camadapter.so and four other
+// blobs that import zero Sk* symbols (see skia.cpp for the per-consumer FACT).
+cc_library_shared {
+    name: "libm95shim_skia",
+    defaults: ["m95shim_defaults"],
+    stem: "libskia",
+    srcs: ["skia.cpp"],
+}
+
+// Overlink placebos for system-only libraries under strict VNDK (stub.cpp has
+// the consumer counts and the evidence path). Unique names on purpose: unlike
+// libskia there IS a system copy, and the blobs with real imports must keep
+// resolving to it until their vendor replacement exists.
+cc_library_shared {
+    name: "libm95shim_camera_client",
+    defaults: ["m95shim_defaults"],
+    srcs: ["stub.cpp"],
+}
+
+cc_library_shared {
+    name: "libm95shim_media",
+    defaults: ["m95shim_defaults"],
+    srcs: ["stub.cpp"],
+}
+
+cc_library_shared {
+    name: "libm95shim_mediautils",
+    defaults: ["m95shim_defaults"],
+    srcs: ["stub.cpp"],
+}
+
+cc_library_shared {
+    name: "libm95shim_android_runtime",
+    defaults: ["m95shim_defaults"],
+    srcs: ["android_runtime.cpp"],
+}
+
+// Strict-VNDK pre-flip set (VNDK_FULL_PREFLIP_BOOT_AUDIT.md §5): overlink
+// placebos and JNI shims that close the camera chain
+// (camera.mt6797.so -> libcam.paramsmgr -> libcam.common.meizu -> libandroid /
+// libjnigraphics / libandroid_runtime / libmeizucamera) and the audio HAL's
+// dlopened libaudio_param_parser.so (libicuuc/libicui18n, zero symbols).
+cc_library_shared {
+    name: "libm95shim_icuuc",
+    defaults: ["m95shim_defaults"],
+    srcs: ["stub.cpp"],
+}
+
+cc_library_shared {
+    name: "libm95shim_icui18n",
+    defaults: ["m95shim_defaults"],
+    srcs: ["stub.cpp"],
+}
+
+cc_library_shared {
+    name: "libm95shim_android",
+    defaults: ["m95shim_defaults"],
+    srcs: ["android.c"],
+}
+
+cc_library_shared {
+    name: "libm95shim_drmframework",
+    defaults: ["m95shim_defaults"],
+    srcs: ["stub.cpp"],
+}
+
+cc_library_shared {
+    name: "libm95shim_stagefright",
+    defaults: ["m95shim_defaults"],
+    srcs: ["stub.cpp"],
+}
+
+cc_library_shared {
+    name: "libm95shim_jnigraphics",
+    defaults: ["m95shim_defaults"],
+    srcs: ["jnigraphics.c"],
+}
+
+// libbt-vendor.so (64-bit only) — the vendor interface the HIDL BT HAL
+// dlopen()s; Flyme shipped it ELF32 only. Forwards to the 64-bit
+// libbluetooth_mtk.so Meizu did ship. The 32-bit blob stays at
+// /vendor/lib/libbt-vendor.so (m95-vendor.mk).
+cc_library_shared {
+    name: "libm95shim_btvendor",
+    defaults: ["m95shim_defaults"],
+    stem: "libbt-vendor",
+    srcs: ["bt_vendor.c"],
+    compile_multilib: "64",
+    shared_libs: ["liblog", "libdl"],
+}
+
+// SSLv3_{client,server}_method for mtk_agpsd and libcurl-ss (see ssl.c).
+cc_library_shared {
+    name: "libm95shim_ssl",
+    defaults: ["m95shim_defaults"],
+    srcs: ["ssl.c"],
+    shared_libs: ["libssl"],
+}
+
+// No-op pthread_mutex_destroy for mnld (ELF32): libmnl.so destroys its
+// session mutex twice, bionic FORTIFY-aborts (see pthread.c). Prepended to
+// mnld's DT_NEEDED by wire-shims.py so it precedes libc for the whole process.
+cc_library_shared {
+    name: "libm95shim_mnld",
+    defaults: ["m95shim_defaults"],
+    srcs: ["pthread.c"],
+    compile_multilib: "32",
+}
+
+// libperfservicenative.so replacement (see perfservice.c): MTK PerfService
+// client that succeeds locally; the stock blob deadlocks the camera provider
+// (CpuCtrlImp) without the perfservice daemon. Blob copies removed from
+// m95-vendor.mk (2026-09-06).
+cc_library_shared {
+    name: "libm95shim_perfservice",
+    defaults: ["m95shim_defaults"],
+    stem: "libperfservicenative",
+    srcs: ["perfservice.c"],
+}

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Meizu MX6 (m95) — VoLTE Java half, LineageOS 18.1 (Android 11).
+
+    Отличие от 16.0 (FACT, дерево 18.1): на Pie имя IMS-пакета жило в
+    frameworks/base как `config_ims_package`, а режим связывания выбирался
+    `config_dynamic_bind_ims`. На R обоих ресурсов НЕТ. Имя пакета читает
+    com.android.phone (PhoneGlobals.java:350-353) из СВОИХ ресурсов —
+    `config_ims_mmtel_package` / `config_ims_rcs_package` (значения по
+    умолчанию пустые, packages/services/Telephony/res/values/config.xml:239).
+    Статического режима на R не осталось, поэтому оверлей нужен ровно один.
+
+    ForgeImsService объявляет android.telephony.ims.ImsService в манифесте
+    донора и работает под uid radio (sharedUserId android.uid.phone), чем
+    нативно проходит uid-гейт сокета rild-ims.
+
+    RCS намеренно НЕ объявляем: порт не несёт RcsFeature.
+-->
+<resources>
+    <string name="config_ims_mmtel_package" translatable="false">com.mediatek.ims</string>
+</resources>

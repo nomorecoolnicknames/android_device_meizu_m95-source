@@ -1,0 +1,49 @@
+# volte_kicker — the URC-3056 -> 900003 forwarder that stands in for the
+# missing Java IMS half's daemon-start reflex (volte-kicker/volte_kicker.c,
+# service in rootdir/init.m95.volte.rc). Client of exactly two sockets:
+# rild-ims (listens for RIL_UNSOL_IMS_ENABLE_START) and volte_imsm (forwards
+# VaEvent 900003 so volte_imsm.so inside mtkmal issues ctl.start for the
+# volte_* daemons — see volte_daemons.te).
+#
+# The domain is deliberately this narrow: no capabilities, no property sets,
+# no device nodes. Identity does the heavy lifting instead — the service runs
+# `user radio` because rild-ims accepts a client only when
+# getpwuid(SO_PEERCRED.uid) is "radio" (librilmtk accept handler, 2026-08-24
+# disassembly), and SELinux cannot substitute for that check.
+
+type volte_kicker, domain;
+type volte_kicker_exec, exec_type, vendor_file_type, file_type;
+init_daemon_domain(volte_kicker)
+
+# Logging + /dev/null: the logd_client() hand-expansion used across this tree.
+allow volte_kicker pmsg_device:chr_file w_file_perms;
+allow volte_kicker logdw_socket:sock_file write;
+allow volte_kicker logd:unix_dgram_socket sendto;
+allow volte_kicker null_device:chr_file rw_file_perms;
+
+# Its own connecting sockets, plus the /dev/socket directory walk.
+allow volte_kicker socket_device:dir search;
+allow volte_kicker self:unix_stream_socket create_socket_perms;
+
+# Client of /dev/socket/rild-ims. The node gets its own type (file.te,
+# rild_oem_socket pattern) precisely so this grant does not have to be a
+# blanket socket_device:sock_file write. The listener lives in the rild
+# process (librilmtk's IMS_RILA_register), hence the rild peer.
+allow volte_kicker rild_ims_socket:sock_file write;
+allow volte_kicker rild:unix_stream_socket connectto;
+
+# Client of /dev/socket/volte_imsm (mtkmal's socket, type from file.te) — the
+# client seat file.te predicted for "the future IMS APK" now has its first
+# native occupant.
+allow volte_kicker mtkmal_socket:sock_file write;
+allow volte_kicker mtkmal:unix_stream_socket connectto;
+
+# persist.mtk.volte.enable falls through to default_prop
+# (plat property_contexts `*` catch-all), which is core_property_type, and
+# public/domain.te already grants every domain get_prop on that — no rule
+# needed for the startup property check.
+#
+# PREDICTED FIRST CENSUS (not granted, by the census discipline): nothing.
+# The binary's whole syscall surface is the two connects, reads, one write,
+# poll and the property read above. Collect after the first enforcing boot:
+#   dmesg | grep -a 'scontext=u:r:volte_kicker'

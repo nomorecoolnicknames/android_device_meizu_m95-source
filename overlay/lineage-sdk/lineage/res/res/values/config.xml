@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Meizu MX6 (m95) lineage-sdk overlay. -->
+<resources>
+    <!-- LED capabilities of this device, bitmask from
+         lineage-sdk/sdk/src/java/org/lineageos/internal/notification/
+         LightsCapabilities.java:
+             1   RGB notification LED      (m95: no, mx-led is mono white)
+             2   RGB battery LED           (no)
+             8   pulsating LED             (yes)
+             16  segmented battery LED     (no)
+             32  adjustable notification LED brightness (no)
+             64  battery LED present       (yes)
+             128 adjustable battery LED brightness      (no)
+         The default in lineage-sdk/lineage/res/res/values/config.xml is 8, and
+         LineageBatteryLights reads bit 64 in its constructor: without it
+         mHasBatteryLed is false, isSupported() returns false and the battery
+         LED is NEVER driven, whatever the light HAL supports. FACT 2026-09-07
+         on m95/18.1: with the ported lights.mt6797 loaded and BACKLIGHT working
+         end to end, `dumpsys battery set status 3; set level 5` left
+         /sys/class/leds/mx-led/brightness at 0 and never called the HAL.
+         Pulsating is real hardware: writing any delay_on/delay_off pair > 0
+         puts the mt65xx ISINK into its breath mode (MEIZU_M80 branch of
+         mt_mt65xx_blink_set; the kernel rewrites the pair to 1/1).
+         Brightness bits are deliberately unset: our HAL derives the LED
+         brightness from the requested colour's luma, it does not read the
+         alpha channel.
+         8 | 64 = 72.
+         NOTE: this is a system-image resource (org.lineageos.platform-res).
+         It has no effect until system.img is rebuilt and flashed. -->
+    <integer name="config_deviceLightCapabilities">72</integer>
+</resources>

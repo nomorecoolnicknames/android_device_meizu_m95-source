@@ -1,0 +1,295 @@
+<!-- m95 device manifest, LineageOS 20 (Android 13).  Carried over unchanged
+     from the 18.1 tree of this device, because the version map it encodes is
+     about the N-era mt6797 blobs, not about the platform: composer@2.1 +
+     HWC2On1Adapter, mapper@2.1 + Gralloc0Hal, camera 2.4 legacy, audio under
+     audio@6.0-impl in-process.  The audio block was already written for
+     Android 13 (see the comment below it).
+
+     target-level 1 = the Android 8.0 framework compatibility matrix, the
+     loosest one, chosen while the blobs are being adapted.  NOT yet verified
+     against Android 13: PRODUCT_ENFORCE_VINTF_MANIFEST is true here
+     (it follows PRODUCT_FULL_TREBLE) and `check_vintf_all` only runs when the
+     images are built, not during `m nothing`.  Entries for HALs whose service
+     ships its own VINTF fragment (wifi@1.0-service, gatekeeper@1.0-
+     service.software, fingerprint@2.0-service.m95) are deliberately absent:
+     the build merges those fragments into this manifest. -->
+<manifest version="1.0" type="device" target-level="1">
+    <!-- Both 2.0 and 6.0 are declared, and both impls are installed: the
+         combined android.hardware.audio.service registers the FIRST version
+         whose impl library is present, i.e. 6.0, and falls back to 2.0 only if
+         6.0 fails to load. Android 13's audio client only knows 7.1/7.0/6.0/
+         5.0/4.0 (frameworks/av/media/libaudiohal/FactoryHalHidl.cpp), and it
+         requires the audio AND effect factories at the SAME major version -
+         with 2.0 alone createPreferredImpl() returns nullptr and there is no
+         sound at all. -->
+    <hal format="hidl">
+        <name>android.hardware.audio</name>
+        <transport>hwbinder</transport>
+        <version>6.0</version>
+        <interface>
+            <name>IDevicesFactory</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+    <hal format="hidl">
+        <name>android.hardware.audio.effect</name>
+        <transport>hwbinder</transport>
+        <version>6.0</version>
+        <interface>
+            <name>IEffectsFactory</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+    <hal format="hidl">
+        <name>android.hardware.audio</name>
+        <transport>hwbinder</transport>
+        <version>2.0</version>
+        <interface>
+            <name>IDevicesFactory</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+    <hal format="hidl">
+        <name>android.hardware.audio.effect</name>
+        <transport>hwbinder</transport>
+        <version>2.0</version>
+        <interface>
+            <name>IEffectsFactory</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+    <hal format="hidl">
+        <name>android.hardware.biometrics.fingerprint</name>
+        <transport>hwbinder</transport>
+        <version>2.1</version>
+        <interface>
+            <name>IBiometricsFingerprint</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+    <hal format="hidl">
+        <name>android.hardware.bluetooth</name>
+        <transport>hwbinder</transport>
+        <version>1.0</version>
+        <interface>
+            <name>IBluetoothHci</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+    <!-- android.hardware.boot@1.0 REMOVED 2026-09-06: m95 is not A/B, there is
+         no bootctrl.mt6797 module, the service exited silently every 5 s
+         (vendor19 boot log); boot@1.0 is optional="true" in FCM level 1. -->
+    <hal format="hidl">
+        <name>android.hardware.camera.provider</name>
+        <transport>hwbinder</transport>
+        <version>2.4</version>
+        <interface>
+            <name>ICameraProvider</name>
+            <instance>legacy/0</instance>
+        </interface>
+    </hal>
+    <hal format="hidl">
+        <name>android.hardware.configstore</name>
+        <transport>hwbinder</transport>
+        <version>1.1</version>
+        <interface>
+            <name>ISurfaceFlingerConfigs</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+    <hal format="hidl">
+        <name>android.hardware.drm</name>
+        <transport>hwbinder</transport>
+        <version>1.0</version>
+        <interface>
+            <name>ICryptoFactory</name>
+            <instance>default</instance>
+        </interface>
+        <interface>
+            <name>IDrmFactory</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+    <!-- android.hardware.gatekeeper 1.0 is declared by the manifest fragment of
+         android.hardware.gatekeeper@1.0-service.software (AOSP software
+         gatekeeper, device.mk). Declaring it here as well makes the whole vendor
+         manifest unparseable ("Cannot add manifest fragment") and then NO HAL
+         can register (2026-09-06, vendor18). -->
+    <hal format="hidl">
+        <name>android.hardware.gnss</name>
+        <transport>hwbinder</transport>
+        <version>1.0</version>
+        <interface>
+            <name>IGnss</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+    <hal format="hidl">
+        <name>android.hardware.graphics.allocator</name>
+        <transport>hwbinder</transport>
+        <version>2.0</version>
+        <interface>
+            <name>IAllocator</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+    <hal format="hidl">
+        <name>android.hardware.graphics.composer</name>
+        <transport>hwbinder</transport>
+        <version>2.1</version>
+        <interface>
+            <name>IComposer</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+    <hal format="hidl">
+        <name>android.hardware.graphics.mapper</name>
+        <transport arch="32+64">passthrough</transport>
+        <version>2.1</version>
+        <interface>
+            <name>IMapper</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+    <hal format="hidl">
+        <name>android.hardware.health</name>
+        <transport>hwbinder</transport>
+        <version>2.1</version>
+        <interface>
+            <name>IHealth</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+    <hal format="hidl">
+        <name>android.hardware.ir</name>
+        <transport>hwbinder</transport>
+        <version>1.0</version>
+        <interface>
+            <name>IConsumerIr</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+    <hal format="hidl">
+        <name>android.hardware.keymaster</name>
+        <transport>hwbinder</transport>
+        <version>3.0</version>
+        <interface>
+            <name>IKeymasterDevice</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+    <hal format="hidl">
+        <name>android.hardware.light</name>
+        <transport>hwbinder</transport>
+        <version>2.0</version>
+        <interface>
+            <name>ILight</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+    <hal format="hidl">
+        <name>android.hardware.media.omx</name>
+        <transport>hwbinder</transport>
+        <version>1.0</version>
+        <interface>
+            <name>IOmx</name>
+            <instance>default</instance>
+        </interface>
+        <interface>
+            <name>IOmxStore</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+    <hal format="hidl">
+        <name>android.hardware.memtrack</name>
+        <transport>hwbinder</transport>
+        <version>1.0</version>
+        <interface>
+            <name>IMemtrack</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+    <hal format="hidl">
+        <name>android.hardware.power</name>
+        <transport>hwbinder</transport>
+        <version>1.0</version>
+        <interface>
+            <name>IPower</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+    <!-- RIL. Not decorative: soong sets Enforce_vintf_manifest (soong.variables
+         "Enforce_vintf_manifest": true) because PRODUCT_FULL_TREBLE_OVERRIDE is
+         true in BoardConfig.mk:113 - NOT because of the shipping API level,
+         which on this build is 25, not 30 (corrected 2026-09-09). So
+         libhidlbase is built with
+         ENFORCE_VINTF_MANIFEST and getService() refuses to look up any HAL
+         missing from the manifest (ServiceManagement.cpp: allowLegacy =
+         !kEnforceVintfManifest, and the EMPTY transport then skips the whole
+         retry loop). FACT 2026-09-07, vendor30: rild ran, registered
+         IRadio/slot1+slot2, and the framework still logged
+         "getRadioProxy: mRadioProxy for slot1 is disabled [PHONE0]" +
+         CommandException: RADIO_NOT_AVAILABLE forever, because RIL.java caches
+         the failed lookup in mDisabledRadioServices and never retries. On
+         LOS16 (shipping API 28) the enforcement was off, which is why the
+         16.0 tree has no radio entry here.
+         Versions: our libril registers IRadio/ISap at @1.1 and IOemHook at
+         @1.0 (ril_service.cpp / sap_service.cpp registerService). slot2 is
+         declared because SIM_COUNT=2 makes registerService loop over both. -->
+    <hal format="hidl">
+        <name>android.hardware.radio</name>
+        <transport>hwbinder</transport>
+        <version>1.1</version>
+        <interface>
+            <name>IRadio</name>
+            <instance>slot1</instance>
+            <instance>slot2</instance>
+        </interface>
+        <interface>
+            <name>ISap</name>
+            <instance>slot1</instance>
+            <instance>slot2</instance>
+        </interface>
+    </hal>
+    <hal format="hidl">
+        <name>android.hardware.radio.deprecated</name>
+        <transport>hwbinder</transport>
+        <version>1.0</version>
+        <interface>
+            <name>IOemHook</name>
+            <instance>slot1</instance>
+            <instance>slot2</instance>
+        </interface>
+    </hal>
+    <hal format="hidl">
+        <name>android.hardware.renderscript</name>
+        <transport arch="32+64">passthrough</transport>
+        <version>1.0</version>
+        <interface>
+            <name>IDevice</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+    <hal format="hidl">
+        <name>android.hardware.sensors</name>
+        <transport>hwbinder</transport>
+        <version>1.0</version>
+        <interface>
+            <name>ISensors</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+    <hal format="hidl">
+        <name>android.hardware.vibrator</name>
+        <transport>hwbinder</transport>
+        <version>1.0</version>
+        <interface>
+            <name>IVibrator</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+    <!-- android.hardware.wifi@1.0: declared by the package fragment
+         android.hardware.wifi@1.0-service.xml (vendor22: duplicate entry ->
+         'HAL android.hardware.wifi has a conflict' -> whole manifest rejected,
+         every HAL down; same trap as gatekeeper, see A11_BRINGUP_STATE 2i). -->
+</manifest>

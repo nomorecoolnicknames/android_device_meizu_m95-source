@@ -1,0 +1,39 @@
+# NVRAM stack. Binaries exist in the blob tree [DEV]; neither is started by
+# our init.mt6797.rc yet. Rules ported from the m681 template [CONV], with
+# the block device adjusted to this device's verified by-name layout.
+
+# nvram_daemon: reads the raw nvram partition, populates /data/nvram
+# (nvdata_file), then flags readiness via service.nvram_init.
+type nvram_daemon, domain;
+init_daemon_domain(nvram_daemon)
+
+allow nvram_daemon nvram_device:blk_file rw_file_perms;
+allow nvram_daemon block_device:dir search;
+allow nvram_daemon nvdata_file:dir create_dir_perms;
+allow nvram_daemon nvdata_file:file create_file_perms;
+allow nvram_daemon self:capability { chown fowner fsetid };
+set_prop(nvram_daemon, nvram_prop)
+
+# nvram_agent_binder: binder service "NvRAMAgent" for framework/radio access
+# to NV data.
+type nvram_agent_binder, domain;
+init_daemon_domain(nvram_agent_binder)
+binder_use(nvram_agent_binder)
+binder_service(nvram_agent_binder)
+
+allow nvram_agent_binder nvram_agent_service:service_manager { add find };
+allow system_server nvram_agent_service:service_manager find;
+allow radio nvram_agent_service:service_manager find;
+
+r_dir_file(nvram_agent_binder, nvdata_file)
+allow nvram_agent_binder nvdata_file:file rw_file_perms;
+allow nvram_agent_binder nvcfg_file:dir create_dir_perms;
+allow nvram_agent_binder nvcfg_file:file create_file_perms;
+
+# Readiness flag consumers
+get_prop(nvram_agent_binder, nvram_prop)
+
+# 2026-08-14 census: nvram_daemon reads the MTK boot-mode attr on startup —
+# FACT: { read open } /sys/devices/virtual/BOOT/BOOT/boot/boot_mode,
+# tcontext generic sysfs. Read-only.
+allow nvram_daemon sysfs:file r_file_perms;

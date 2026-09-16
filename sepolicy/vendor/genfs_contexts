@@ -1,0 +1,110 @@
+# genfs_contexts — Meizu MX6 (m95), MT6797.
+
+# /proc/m4u — FACT: kernel/m685 m4u.c:2626 proc_create("m4u"). The Pie base
+# policy no longer labels /m4u (same finding as the m681 LOS16 port).
+genfscon proc /m4u u:object_r:mtk_m4u_proc:s0
+
+# WMT debug/trigger entries — FACT: kernel/m685 connectivity driver creates
+# proc_create("driver/wmt_dbg") and "driver/wmt_aee".
+genfscon proc /driver/wmt_dbg u:object_r:mtk_wmt_proc:s0
+genfscon proc /driver/wmt_aee u:object_r:mtk_wmt_proc:s0
+
+# CCCI modem status attrs — FACT: /sys/kernel/ccci referenced by stock ueventd.
+genfscon sysfs /kernel/ccci u:object_r:sysfs_ccci:s0
+
+# LED class devices. The base policy labels /sys/class/leds (symlinks); the
+# real attrs live under the mt65xx_leds platform device — FACT: backlight path
+# /sys/class/leds/lcd-backlight verified live (DEVICE_FACTS.md), platform
+# device path from rootdir/ueventd.mt6797.rc.
+genfscon sysfs /devices/platform/leds-mt65xx u:object_r:sysfs_leds:s0
+
+# Meizu sensor class devices — FACT: kernel/m685 drivers/base/meizu-sys.c
+# creates class "meizu"; devices with no parent land under /sys/devices/virtual.
+# (INFERENCE on the exact /devices/virtual path — verify with a live ls.)
+genfscon sysfs /devices/virtual/meizu u:object_r:sysfs_meizu:s0
+
+# Battery: the fuel gauge is a bq27532 i2c device (kernel/m685
+# power/mt6797/bq27532_battery.c), so its power_supply sysfs path contains an
+# unstable i2c segment. Label the class dir; refine to the device path once a
+# live boot shows it.
+genfscon sysfs /class/power_supply u:object_r:sysfs_batteryinfo:s0
+
+# ...and here is that live boot. The /class entry above is NOT enough on its
+# own: /sys/class/power_supply/battery is a symlink, and genfscon labels the
+# real inode, so every attribute read through it resolves to the /devices path
+# and lands on plain `sysfs`.
+#
+# FACT (live device, 2026-08-10):
+#   avc: denied { read open getattr } for
+#        path="/sys/devices/platform/battery/power_supply/battery/present"
+#        dev="sysfs" scontext=u:r:healthd:s0 tcontext=u:object_r:sysfs:s0
+#        tclass=file  permissive=1                                    (x24)
+#
+# No allow rule is needed and none is written: system/sepolicy/public/healthd.te:32
+# already carries r_dir_file(healthd, sysfs_batteryinfo), and hal_health.te:22
+# states outright that labelling the battery attributes is the vendor's job.
+# The label is the whole fix.
+#
+# Without it, under enforcing: healthd cannot read `present`, so it treats the
+# battery as absent. That is not cosmetic - healthd drives charging UI, the
+# low-battery shutdown path and BatteryService, and an absent battery is the
+# state that makes it stop reporting capacity entirely.
+#
+# Scope is the battery's power_supply subtree rather than the single denied
+# file, deliberately: healthd polls the whole attribute set (capacity, status,
+# health, voltage_now, temp), `present` is simply the one that shows up in this
+# boot's log, and sysfs_batteryinfo is readable only by healthd, charger,
+# hal_health_server and perfprofd - exactly the set that should see it.
+genfscon sysfs /devices/platform/battery/power_supply u:object_r:sysfs_batteryinfo:s0
+
+# eMMC I/O statistics for storaged.
+#
+# FACT (live device, 2026-08-10):
+#   avc: denied { read open getattr } for
+#     path="/sys/devices/mtk-msdc.0/11230000.msdc0/mmc_host/mmc0/mmc0:0001/block/mmcblk0/stat"
+#     dev="sysfs" scontext=u:r:storaged:s0 tcontext=u:object_r:sysfs:s0
+#     tclass=file  permissive=1                                      (x14)
+#
+# Again label-only: system/sepolicy/private/storaged.te:14 already has
+# r_dir_file(storaged, sysfs_disk_stat) and its comment says "Vendors should
+# mark sysfs_disk_stat on all files read by storaged".
+#
+# Without it, under enforcing: storaged records no disk I/O, so per-uid I/O
+# accounting and the disk-stats section of bugreports are silently empty.
+#
+# Only the `stat` file is labelled, NOT the whole mmcblk0 directory. Labelling
+# the directory would re-type every attribute under it (size, ro, the
+# mmcblk0p* partition dirs) to a type only storaged may read, which would take
+# those reads away from vold and the framework. `mmc0:0001` is the eMMC's RCA;
+# it is fixed for a soldered part, but if this path ever stops matching the
+# symptom is exactly the denial above returning.
+#
+# DISABLED 2026-09-10: the type sysfs_disk_stat exists only in the Android 11
+# platform policy. On the Android 13 GSI the vendor policy is compiled at boot
+# by /system/bin/secilc against A13's plat policy, which rejects this line --
+#   Type sysfs_disk_stat is invalid for role object_r
+#   Invalid genfscon at /vendor/etc/selinux/vendor_sepolicy.cil:9
+#   Failed to compile cildb: -1 -> Unable to open SELinux policy
+#   init: InitFatalReboot: signal 6  (reboot to recovery, boot loop)
+# -- and the whole system cannot boot. The previous session removed this line
+# only on the device, so the first vendor image rebuilt from the tree brought it
+# back and the phone looped. Keeping it out of the tree makes the fix permanent;
+# the cost is only the label (SELinux runs permissive here), so storaged's I/O
+# accounting stays as it is on any build without this line.
+# genfscon sysfs /devices/mtk-msdc.0/11230000.msdc0/mmc_host/mmc0/mmc0:0001/block/mmcblk0/stat u:object_r:sysfs_disk_stat:s0
+
+# MTK GPU extension device + command queue + thermal driver tree — FACT
+# (2026-08-14 census): live denials name /proc/ged (ioctl from 9 domains),
+# /proc/mtk_cmdq (camera MDP-0 ioctl 0x7805, MtkOmx read) and
+# /proc/driver/thermal/mdm_mdinfoex_thre (vendor thermal daemon, currently in
+# init's domain). Types declared in file.te.
+genfscon proc /ged u:object_r:proc_ged:s0
+genfscon proc /mtk_cmdq u:object_r:proc_cmdq:s0
+genfscon proc /driver/thermal u:object_r:proc_mtk_thermal:s0
+
+# MTK CPU hotplug governor. m95_fatal_capture writes /proc/hps/enabled to pin the
+# online mask before a capture (rootdir/m95-fatal-capture.sh); the memory note
+# `m95-a11-mali-region-layout-and-hps-panic` records why hps has to be turned off
+# on this device at all. Labelled so a core domain may be granted it without
+# opening generic /proc.
+genfscon proc /hps u:object_r:proc_hps:s0

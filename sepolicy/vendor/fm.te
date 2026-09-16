@@ -1,0 +1,18 @@
+# FM-радио (MT6631, приёмник в составе комбо-чипа CONSYS).
+#
+# Приложение: packages/apps/FMRadio (com.android.fmradio) подписано
+# платформенным ключом и не объявляет sharedUserId, поэтому по
+# system/sepolicy/private/seapp_contexts:157 («user=_app seinfo=platform
+# domain=platform_app») работает в домене platform_app, а не system_app.
+# Его JNI-библиотека открывает узел напрямую и дальше общается ioctl'ами
+# (packages/apps/FMRadio/jni/fmr/fmr.h:66 FM_DEV_NAME "/dev/fm"); узел
+# размечен в file.te:24 и file_contexts:54, права 0660 media:media выдаёт
+# ueventd.mt6797.rc:74.
+#
+# На 18.1 ядро грузится с androidboot.selinux=permissive (BoardConfig.mk:142),
+# поэтому сегодня правило ничего не разблокирует — оно нужно, чтобы FM не
+# отвалилось молча на переходе в enforcing (SEPOLICY_LANE.md, память
+# `dontaudit-hides-real-failures`). allowxperm сознательно НЕ добавляется:
+# на этом ядре пара allow/allowxperm вырождается в deny-all
+# (ioctl_xperms.te, память `m95-enforcing-blockers`).
+allow platform_app fm_device:chr_file rw_file_perms;

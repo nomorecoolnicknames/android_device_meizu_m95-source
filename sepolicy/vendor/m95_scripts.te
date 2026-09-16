@@ -1,0 +1,73 @@
+# M95 — domains for our three init-run shell scripts.
+#
+# ⚠ PREPARED, NOT BUILT AND NOT FLASHED (2026-08-15). The device was wedged in
+# fastboot when this was written, so it could not be tested. Build, flash and
+# re-run the census only with a healthy device in hand — a policy mistake here
+# costs a boot.
+#
+# WHY THIS EXISTS
+# Three of our services run a shell script rather than a binary:
+#   m95_cpuset         /system/bin/sh /m95-cpuset.sh
+#   m95_bdaddr         /system/bin/sh /m95-bdaddr.sh
+#   m95_fatal_capture  /system/bin/sh /m95-fatal-capture.sh
+# A domain is normally derived from the executable's file context, but all
+# three share one executable (shell_exec), so one file-context transition
+# cannot serve three different domains. The census showed the consequence:
+#   avc: denied { execute_no_trans } for path="/system/bin/sh"
+#        scontext=u:r:init:s0 tcontext=u:object_r:shell_exec:s0
+# and init.te:518 forbids granting that outright — it would let init execute
+# arbitrary shell code in its own domain. The correct mechanism is an explicit
+# seclabel in the rc file, which is what the matching rc change adds.
+
+##############################################################################
+# m95_cpuset — keeps /dev/cpuset/*/cpus in sync with the online CPU mask.
+# Reads /sys/devices/system/cpu/online, writes the cpuset cgroup files, loops.
+##############################################################################
+type m95_cpuset, domain;
+allow init m95_cpuset:process transition;
+allow m95_cpuset vendor_shell_exec:file { read open getattr execute entrypoint map };
+allow m95_cpuset init:process sigchld;
+allow m95_cpuset vendor_toolbox_exec:file { read open getattr execute execute_no_trans map };
+allow m95_cpuset vendor_file:dir { search read open getattr };
+allow m95_cpuset sysfs:file { read open getattr };
+allow m95_cpuset cgroup:dir { search read open };
+allow m95_cpuset cgroup:file { read write open getattr };
+allow m95_cpuset self:capability sys_nice;
+
+##############################################################################
+# m95_bdaddr — one-shot: reads the Bluetooth address out of NVRAM and publishes
+# it as persist.service.bdroid.bdaddr. Reads /data/nvram/.../BT_Addr, uses od,
+# tr and sed from toolbox, sets one property.
+##############################################################################
+type m95_bdaddr, domain;
+allow init m95_bdaddr:process transition;
+allow m95_bdaddr vendor_shell_exec:file { read open getattr execute entrypoint map };
+allow m95_bdaddr init:process sigchld;
+allow m95_bdaddr vendor_toolbox_exec:file { read open getattr execute execute_no_trans map };
+allow m95_bdaddr vendor_file:dir { search read open getattr };
+allow m95_bdaddr nvdata_file:dir search;
+allow m95_bdaddr nvdata_file:file { read open getattr };
+set_prop(m95_bdaddr, bluetooth_prop)
+
+##############################################################################
+# m95_fatal_capture — bring-up helper: pins CPUs and captures state into
+# /cache when a fatal is expected. Writes /proc/hps/enabled, cpu online nodes
+# and cpuset files, and creates a directory under /cache.
+##############################################################################
+type m95_fatal_capture, domain, coredomain;
+allow init m95_fatal_capture:process transition;
+allow m95_fatal_capture shell_exec:file { read open getattr execute entrypoint map };
+allow m95_fatal_capture init:process sigchld;
+allow m95_fatal_capture toolbox_exec:file { read open getattr execute execute_no_trans map };
+# Was `allow m95_fatal_capture { sysfs proc }:file rw`. private/coredomain.te:99
+# forbids a coredomain touching unlabelled /proc and /sys -- the fix the
+# neverallow asks for is a label, not an exemption. The two nodes this script
+# writes are the CPU online mask (AOSP already labels /devices/system/cpu) and
+# /proc/hps/enabled (labelled proc_hps by our genfs_contexts).
+allow m95_fatal_capture sysfs_devices_system_cpu:file { read write open getattr };
+allow m95_fatal_capture proc_hps:dir search;
+allow m95_fatal_capture proc_hps:file { read write open getattr };
+allow m95_fatal_capture cgroup:dir { search read open };
+allow m95_fatal_capture cgroup:file { read write open getattr };
+allow m95_fatal_capture cache_file:dir { search write add_name create setattr getattr open read };
+allow m95_fatal_capture cache_file:file { create write open getattr setattr };

@@ -1,0 +1,91 @@
+# R-split bring-up exemptions for m95 vendor domains.
+#
+# These are AOSP's sanctioned escape hatches (system/sepolicy/public/domain.te,
+# TODO b/34980020 and b/70393317), the same mechanism TREBLE_VENDOR_PARTITION_PLAN.md
+# §4.1a prescribes and nx549j-class ports use. They silence the *build-time*
+# neverallows for N-era MTK daemons that own files outside /data/vendor/*.
+# Runtime is permissive during bring-up, so nothing here changes behavior yet;
+# each entry is re-justified from live denials before enforcing.
+#
+# data_between_core_and_vendor_violators: vendor domains touching
+# core_data_file_type (nvdata/mnld/mcd/sensor/thermal/epdg state compiled
+# into the blobs as fixed /data paths — cannot move to /data/vendor).
+typeattribute mnld data_between_core_and_vendor_violators;
+typeattribute mtk_agpsd data_between_core_and_vendor_violators;
+typeattribute mcd data_between_core_and_vendor_violators;
+typeattribute ccci_fsd data_between_core_and_vendor_violators;
+typeattribute ccci_mdinit data_between_core_and_vendor_violators;
+typeattribute nvram_daemon data_between_core_and_vendor_violators;
+typeattribute nvram_agent_binder data_between_core_and_vendor_violators;
+typeattribute thermal data_between_core_and_vendor_violators;
+typeattribute thermald data_between_core_and_vendor_violators;
+typeattribute thermal_manager data_between_core_and_vendor_violators;
+typeattribute epdg_wod data_between_core_and_vendor_violators;
+typeattribute pq data_between_core_and_vendor_violators;
+typeattribute mtkmal data_between_core_and_vendor_violators;
+typeattribute emdlogger data_between_core_and_vendor_violators;
+typeattribute fuelgauged data_between_core_and_vendor_violators;
+typeattribute batterywarning data_between_core_and_vendor_violators;
+typeattribute gsm0710muxd data_between_core_and_vendor_violators;
+
+# vendor_executes_system_violators: vendor daemons executing /system shell
+# and toolbox (nvram_daemon runs scripts; fuelgauged/batterywarning read
+# system files). Covers both the exec neverallow (domain.te:940) and the
+# /system access neverallow (domain.te:1025).
+typeattribute nvram_daemon vendor_executes_system_violators;
+typeattribute fuelgauged vendor_executes_system_violators;
+typeattribute batterywarning vendor_executes_system_violators;
+
+##############################################################################
+# Round 2 (2026-09-09, enforcing lane). The domains below are the ones whose
+# rules the first R-split pass commented out with "R-SPLIT-DROP". Each is a
+# HAL or daemon that keeps state under a fixed /data path compiled into the
+# blob, i.e. exactly the case the AOSP attribute exists for.
+##############################################################################
+
+# HAL domains holding core_data_file_type paths:
+#   hal_audio_default      /data/nvram (audio calibration)
+#   hal_camera_default     /data/nvram (lens/sensor cal) + /data/media (LSC dumps)
+#   hal_sensors_default    /data/nvram, /data/misc/sensor, /data/iNemoEngine_gbias.dat
+#   hal_gnss_default       /data/misc/mnld (mnld socket + state)
+#   hal_bluetooth_default  /data/nvram (BT address)
+#   hal_keymaster_default  /data/app/mcRegistry (Trustonic)
+#   hal_gatekeeper_default /data/app/mcRegistry + /data/misc/gatekeeper
+#   hal_fingerprint_default /data/system/users/*/fpdata (goodix templates)
+#   rild                   /data/nvram (modem calibration)
+typeattribute hal_audio_default data_between_core_and_vendor_violators;
+typeattribute hal_camera_default data_between_core_and_vendor_violators;
+typeattribute hal_sensors_default data_between_core_and_vendor_violators;
+typeattribute hal_gnss_default data_between_core_and_vendor_violators;
+typeattribute hal_bluetooth_default data_between_core_and_vendor_violators;
+typeattribute hal_keymaster_default data_between_core_and_vendor_violators;
+typeattribute hal_gatekeeper_default data_between_core_and_vendor_violators;
+typeattribute hal_fingerprint_default data_between_core_and_vendor_violators;
+typeattribute rild data_between_core_and_vendor_violators;
+
+# m95_bdaddr reads /data/nvram/APCFG/APRDEB/BT_Addr. It stopped being a
+# coredomain in this round (it runs /vendor/bin/sh), so it needs the same
+# exemption every other vendor reader of /data/nvram needs.
+typeattribute m95_bdaddr data_between_core_and_vendor_violators;
+
+# socket_between_core_and_vendor_violators: vendor daemons whose UNIX sockets
+# core domains connect to. All four are N-era MTK sockets under /dev/socket,
+# which is where the blobs and our own ImsService look for them; there is no
+# HIDL interface to move the traffic onto.
+#   rild      /dev/socket/rild, rild-ims   <- radio (framework + ForgeImsService)
+#   mtkmal    /dev/socket/volte_imsm       <- radio
+#   rilproxy  /dev/socket/rilproxy         <- radio
+#   mcd       /dev/socket/mcd (Trustonic)  <- fingerprintd (coredomain)
+typeattribute rild socket_between_core_and_vendor_violators;
+typeattribute mtkmal socket_between_core_and_vendor_violators;
+typeattribute rilproxy socket_between_core_and_vendor_violators;
+typeattribute mcd socket_between_core_and_vendor_violators;
+
+# vendor_init creates and chowns MTK's fixed /data directories from our own rc
+# files (/data/.tp, /data/md3, /data/ccci_cfg, /data/gps_mnl, /data/agps_supl,
+# /data/mpe_mnl, /data/gf_data, /data/misc/mcRegistry). public/domain.te:895
+# forbids a non-core domain any dir access to system_data_file beyond
+# { getattr search }, and the paths are compiled into the blobs, so they cannot
+# move to /data/vendor. Same exemption the sibling port in this tree uses:
+# device/nubia/msm8953-common/sepolicy/vendor/vendor_init.te:1.
+typeattribute vendor_init data_between_core_and_vendor_violators;

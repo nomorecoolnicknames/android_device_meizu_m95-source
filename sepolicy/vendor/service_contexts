@@ -1,0 +1,19 @@
+# Framework binder services registered by MTK vendor daemons.
+# NvRAMAgent is registered with the plat servicemanager by nvram_agent_binder.
+NvRAMAgent                                u:object_r:nvram_agent_service:s0
+# Registered by goodixfingerprintd (see sepolicy/fingerprintd.te). The name is
+# the exact string the daemon passes to addService.
+android.hardware.fingerprint.IGoodixFingerprintDaemon  u:object_r:goodixfingerprintd_service:s0
+# Registered by /vendor/bin/pq. The name is "PQ" -- two characters, not the
+# C++ class name PQService. Confirmed by the audit record, not guessed:
+#   avc: denied { add } for service=PQ pid=418 scontext=u:r:pq:s0
+#        tcontext=u:object_r:default_android_service:s0
+PQ                                        u:object_r:pq_service:s0
+# MTK GuiExt, framework-servicemanager side.
+#
+# With ro.vendor.binder.framework_domain=1 the composer HAL and the OMX
+# service both run their ProcessState on /dev/binder instead of
+# /dev/vndbinder, so GuiExtService is registered here rather than with
+# vndservicemanager. The vndservice_contexts entry is kept as well: it costs
+# nothing and it is what applies if the property is turned back off.
+GuiExtService                             u:object_r:guiext_service:s0

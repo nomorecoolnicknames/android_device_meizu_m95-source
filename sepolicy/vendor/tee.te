@@ -1,0 +1,37 @@
+# Trustonic TEE (t-base): mcDriverDaemon + clients.
+# Evidence: trustlets in vendor/app/mcRegistry and libMcTeeKeymaster /
+# libMcGatekeeper in vendor/lib*/hw exist in the blob tree [DEV]. Node names
+# /dev/mobicore{,-user} and the /data registry path are Trustonic convention
+# [CONV] — not yet observed on this device.
+
+type mcd, domain;
+init_daemon_domain(mcd)
+
+allow mcd mobicore_device:chr_file rw_file_perms;
+allow mcd mobicore_user_device:chr_file rw_file_perms;
+allow mcd mcd_data_file:dir create_dir_perms;
+allow mcd mcd_data_file:file create_file_perms;
+# trustlet binaries in /vendor/app/mcRegistry
+r_dir_file(mcd, vendor_file)
+
+# Clients: keymaster/gatekeeper HAL services wrap libMcTeeKeymaster /
+# libMcGatekeeper; a future fingerprint HAL wraps the Goodix TA. They talk to
+# the TEE via /dev/mobicore-user and the mcd socket.
+allow hal_keymaster_default mobicore_user_device:chr_file rw_file_perms;
+allow hal_keymaster_default mcd:unix_stream_socket connectto;
+r_dir_file(hal_keymaster_default, mcd_data_file)
+
+allow hal_gatekeeper_default mobicore_user_device:chr_file rw_file_perms;
+allow hal_gatekeeper_default mcd:unix_stream_socket connectto;
+r_dir_file(hal_gatekeeper_default, mcd_data_file)
+
+# hal_fingerprint is the attribute, so this covers whichever fingerprint HAL
+# implementation ships. Since 2026-08-10 that is the LineageOS
+# biometrics.fingerprint@2.0-service (hal_fingerprint_default), which dlopens
+# the blob fingerprint.default.so; the actual sensor and TEE work happens one
+# process further down in goodixfingerprintd — see sepolicy/fingerprintd.te.
+# The HAL process itself only needs the TEE reachable because the shim it
+# loads links libMcClient transitively; it never touches the sensor node.
+allow hal_fingerprint fingerprint_device:chr_file rw_file_perms;
+allow hal_fingerprint mobicore_user_device:chr_file rw_file_perms;
+allow hal_fingerprint mcd:unix_stream_socket connectto;

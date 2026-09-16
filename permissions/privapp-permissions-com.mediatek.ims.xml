@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Белый список привилегированных разрешений для ForgeImsService (пакет
+  com.mediatek.ims), который ставится в /system/priv-app.
+
+  FACT 2026-09-07: без этого файла system_server бросает на старте
+  IllegalStateException "Signature|privileged permissions not in
+  privapp-permissions whitelist: {com.mediatek.ims (/system/priv-app/
+  ForgeImsService): android.permission.READ_PRECISE_PHONE_STATE}" и падает по
+  кругу каждые ~19 с — телефон не догружается. На Android 11 проверка белого
+  списка применяется к любому привилегированному приложению НЕЗАВИСИМО от того,
+  подписано ли оно платформенным ключом.
+-->
+<permissions>
+    <privapp-permissions package="com.mediatek.ims">
+        <permission name="android.permission.READ_PRECISE_PHONE_STATE"/>
+        <permission name="android.permission.READ_PRIVILEGED_PHONE_STATE"/>
+        <permission name="android.permission.MODIFY_PHONE_STATE"/>
+        <permission name="android.permission.INTERACT_ACROSS_USERS"/>
+    </privapp-permissions>
+</permissions>

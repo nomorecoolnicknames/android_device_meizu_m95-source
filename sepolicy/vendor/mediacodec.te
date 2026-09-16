@@ -1,0 +1,25 @@
+# MTK OMX codecs run in mediacodec (Pie vendor omx domain) and drive the
+# hardware codec via /dev/Vcodec + m4u/SMI. [CONV: m681 template + node
+# names from our ueventd/kernel]
+
+allow mediacodec video_device:chr_file rw_file_perms;
+allow mediacodec mtk_m4u_proc:file rw_file_perms;
+allow mediacodec MTK_SMI_device:chr_file rw_file_perms;
+allow mediacodec gpu_device:chr_file rw_file_perms;
+allow mediacodec sysfs:file r_file_perms;
+# /dev/devmap — devinfo (efuse) read-only map. [CONV 2026-08-18, log-audit]
+# libvcodec_oal.so carries the /dev/devmap path string; no live failure was
+# captured from vdec (only the camera provider's SeninfDrvImp logged the DAC
+# refusal), but once the ueventd rule opens DAC (group camera covers this
+# domain's process too) a blob attempt would surface as a fresh avc denial.
+# Read-only, same shape as the hal_camera_default pair.
+allow mediacodec devmap_device:chr_file r_file_perms;
+
+# 2026-08-14 census: the MtkOmx codecs query the GED and CMDQ proc nodes —
+# FACT: { read open } /proc/ged + /proc/mtk_cmdq (HwBinder:441_*), { ioctl }
+# /proc/ged 0x6765, and { read } dev_info sysfs (comm MtkOmxVencEncod, the
+# node is labelled by file_contexts:134 via init restorecon). Types declared
+# in file.te; no allowxperm on purpose (kernel xperm defect, ioctl_xperms.te).
+allow mediacodec proc_ged:file r_file_perms;
+allow mediacodec proc_cmdq:file r_file_perms;
+allow mediacodec sysfs_dev_info:file r_file_perms;

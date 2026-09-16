@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Meizu MX6 (m95) — биометрия, LineageOS 18.1 (Android 11).
+
+    Отдельный файл, а не дополнение к config.xml той же папки: config.xml
+    сейчас в работе у линии VoLTE (незакоммичен), а ресурсы всех файлов
+    res/values/*.xml всё равно сливаются в один пакет — так правки двух линий
+    не конфликтуют.
+
+    В Android 11 появился AuthService: он строит список аутентификаторов
+    ИСКЛЮЧИТЕЛЬНО из этого массива (frameworks/base/services/core/java/com/
+    android/server/biometrics/AuthService.java:103, SensorConfig.java), а в
+    AOSP-дереве массив пуст — единственный пример закомментирован
+    (frameworks/base/core/res/res/values/config.xml:4208-4210). На Pie (16.0)
+    такого гейта не было вовсе, поэтому перенос отпечатка с 16.0 без этой
+    строки оставляет BiometricManager.canAuthenticate() с
+    BIOMETRIC_ERROR_NO_HARDWARE даже при живом HAL: регистрация и
+    разблокировка экрана идут через FingerprintManager.isHardwareDetected() и
+    работают, а BiometricPrompt (приложения, банки, подтверждение покупок) —
+    нет.
+
+    Формат «ID:модальность:стойкость»: ID уникален для устройства,
+    модальность — BiometricAuthenticator.TYPE_FINGERPRINT = 2, стойкость —
+    Authenticators.BIOMETRIC_STRONG = 15. Та же строка стоит у соседнего
+    устройства этого же дерева (device/nubia/msm8953-common/overlay/
+    frameworks/base/core/res/res/values/config.xml:485).
+-->
+<resources>
+    <string-array name="config_biometric_sensors" translatable="false" >
+        <item>0:2:15</item> <!-- ID0:Fingerprint:Strong -->
+    </string-array>
+</resources>

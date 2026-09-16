@@ -1,0 +1,16 @@
+# First-fatal userspace capture for the M95 Pie bring-up image.
+# /cache is mounted from fstab.mt6797 before post-fs. The collector writes only
+# under /cache/m95-fatal-capture; it never accesses /misc, para, or any block
+# device.
+
+on post-fs
+    start m95_fatal_capture
+
+service m95_fatal_capture /system/bin/sh /m95-fatal-capture.sh
+    # Explicit domain: this service runs /system/bin/sh, and a file-context
+    # transition cannot serve three scripts that share one executable.
+    seclabel u:r:m95_fatal_capture:s0
+    class core
+    user root
+    group root system log
+    disabled

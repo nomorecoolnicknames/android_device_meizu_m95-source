@@ -1,0 +1,164 @@
+# MTK Modem Abstraction Layer daemon — /vendor/bin/mtkmal.
+#
+# WHY THIS EXISTS: without it mtkmal runs in init's own domain. FACT
+# (ps -AZ, live device): `u:r:init:s0 radio 407 ... mtkmal`. Its binary is
+# labelled vendor_file with no *_exec type, so there is no domain transition
+# and it inherits init's. It is started from /vendor/etc/init/init.mal.rc:26
+# and :33, a vendor rc absent from this tree, so a seclabel cannot be set from
+# here — the transition has to come from the executable's type, which is what
+# the file_contexts entry alongside this file provides.
+#
+# WHY IT MATTERS: mtkmal is telephony-critical (modem abstraction, IMS/VoLTE;
+# it owns rild-mal, rild-mal-at, mal-mfi and volte_imsm). It produces no
+# denials today precisely because init's domain already covers everything,
+# which is exactly why it would have been missed when enforcing is switched on.
+#
+# ACCURACY, NOT JUST SAFETY: FACT (/proc/407/status) its DAC identity is
+# Uid 1001 (radio), groups system log wifi cache inet everybody — it is not
+# root. init's domain therefore grants it far more than it uses.
+#
+# SAFE TO LAND NOW: SELinux on this build is permissive, so an incomplete
+# domain cannot break the daemon — denials are logged and the access proceeds.
+# That is the point of landing it early: this boot produces the access census
+# that finishes the domain, and it must be complete BEFORE enforcing.
+#
+# STARTING SET, from what it actually holds open (FACT, ls -l /proc/407/fd):
+# /dev/null, /dev/pmsg0 and three sockets. Deliberately minimal — everything
+# else is meant to show up as a denial and be added deliberately.
+type mtkmal, domain;
+type mtkmal_exec, exec_type, vendor_file_type, file_type;
+
+init_daemon_domain(mtkmal)
+
+# Logging: /dev/pmsg0 plus the logd socket.
+# logd_client() is not defined in this tree's te_macros - checkpolicy rejects
+# it as a syntax error. Expanded by hand to what it would have produced.
+allow mtkmal pmsg_device:chr_file w_file_perms;
+allow mtkmal logdw_socket:sock_file write;
+allow mtkmal logd:unix_dgram_socket sendto;
+
+# /dev/null.
+allow mtkmal null_device:chr_file rw_file_perms;
+
+# Its own sockets under /dev/socket (rild-mal, rild-mal-at, mal-mfi,
+# volte_imsm) and the ones it connects out to.
+allow mtkmal socket_device:dir search;
+allow mtkmal self:unix_stream_socket create_stream_socket_perms;
+allow mtkmal self:unix_dgram_socket create_socket_perms;
+
+# NEXT STEP after this boots: collect
+#   logcat -b all -d | grep 'avc: denied' | grep 'scontext=u:r:mtkmal'
+# and extend from there. Expect ccci nodes for the modem link, which the fd
+# snapshot would not have caught because they are opened transiently.
+
+# == 2026-08-18 census: first enforcing boot with the rild-ims init fix ==
+# Two denials, dmesg audit 1787068978.980:8-9 (full lines and the decode walk
+# in the m95 repo, analysis-lanes/volte-stack.md).
+#
+# Denial 1: avc denied { read } name="lib" ino=2340 tcontext=vendor_file
+# tclass=dir. mtkmal is a 30 KB loader: main() picks LIB_PATH /vendor/lib,
+# opendir()s it and dlopen()s every "libmal_"/"libmd_"-prefixed entity in it,
+# resolving <entity>_entity_init per library (FACT: strings + dynsym of
+# /vendor/bin/mtkmal — opendir/readdir/dlopen/dlsym, 'LIB_PATH = "%s",
+# LIB_PREFIX = "%s"', "libmal_", "libmd_", "%s_entity_init"). This denial
+# therefore beheads the daemon: no entity loads, and /dev/socket/volte_imsm
+# (bound by init for it) never gets its listen() — observed live as flags
+# 00000000 in /proc/net/unix while the process idles in futex_wait. Entities
+# on this build: libmal_{datamngr,epdga,imsmngr,mdmngr,nwmngr,rds,rilproxy,
+# simmngr}.so (FACT: ls /vendor/lib). All are plain vendor_file — the plat
+# fallback /(vendor|system/vendor)(/.*)? labels them and no
+# same_process_hal_file override matches (FACT: dumped file_contexts).
+allow mtkmal vendor_file:dir r_dir_perms;
+# dlopen = open/read/getattr + mmap PROT_EXEC. Not execute_no_trans: these
+# are libraries, nothing is execve()d.
+allow mtkmal vendor_file:file { read open getattr execute map };
+
+# Denial 2: avc denied { write } tcontext=property_socket tclass=sock_file.
+# The launcher's only property_set() targets are "ril.mal.flag" (MAL-up flag)
+# and "ril.muxreport" (the TRM modem-reset path in mdfx_sigsegv_hdl) — FACT:
+# strings of /vendor/bin/mtkmal; every other property string there pairs with
+# a property_get log line. "ril." is radio_prop (plat_property_contexts:14),
+# the same grant gsm0710muxd already holds (modem_daemons.te:62).
+set_prop(mtkmal, radio_prop)
+
+# PREDICTED NEXT CENSUS — deliberately NOT granted (this file adds rights on
+# observed denials only). Once the entities load, libmal_rilproxy should
+# connect out to mtkrild's rild-mal/rild-mal-at sockets (socket_device
+# fallback labels — see the rild-oem note in file_contexts) and the modem
+# link may touch ccci nodes:
+#   allow mtkmal rild:unix_stream_socket connectto;
+#   allow mtkmal socket_device:sock_file write;
+#   allow mtkmal ccci_device:chr_file rw_file_perms;
+# If the next boot shows exactly these, they are pre-justified above;
+# anything else gets its own decode first.
+
+# == 2026-08-18 census #2: first boot with the entities actually loaded ==
+# (Delivery lesson from that cycle, recorded so nobody loses it again: the
+# compiled policy lives in the BOOT ramdisk (out/.../root/sepolicy), not in
+# /system — sepolicy changes ship via bootimage, a systemimage flash changes
+# nothing.)
+#
+# Outcome of the prediction above: PARTIAL. sock_file write appeared, but at
+# the daemon's OWN sockets (640x name="mal-mfi"), not rild's; no rild
+# connectto, no ccci yet. The fresh census, decoded in the m95 repo
+# analysis-lanes/volte-stack.md:
+#
+# 1) 640x { write } name="mal-mfi" tclass=sock_file tcontext=socket_device.
+# The entities connect back into their own service's listening sockets as
+# clients. Both mal-daemon sockets (and the chiptest twins) are now labelled
+# mtkmal_socket (file.te / file_contexts, rild_oem_socket pattern) so the
+# grant does not cover every unlabelled socket on the device.
+allow mtkmal mtkmal_socket:sock_file write;
+# Second half of the same connect(): the peer socket is held by this very
+# domain. Absent from the census only because the sock_file check fails
+# first — connect() checks the path before the peer process.
+allow mtkmal self:unix_stream_socket connectto;
+
+# 2) { set } property=ctl.stop$volte_stack / volte_ua / volte_imcb,
+# tcontext=ctl_stop_prop. mtkmal itself drives the three VoLTE daemons —
+# this corrects the earlier working model that only the IMS APK starts them.
+# Exact-entry property type instead of ctl_stop_prop wholesale; the start$
+# halves ride along: same control channel, and stop-then-start is the only
+# sequence a oneshot service supports.
+set_prop(mtkmal, ctl_volte_prop)
+
+# 3) { set } property=net.handover.thlte tcontext=system_prop. Own type
+# (property_contexts "net.handover." beats plat "net.") instead of handing a
+# vendor daemon system_prop.
+set_prop(mtkmal, m95_handover_prop)
+
+# 4) { wake_alarm } capability2 — CLOCK_REALTIME_ALARM/CLOCK_BOOTTIME_ALARM
+# timers (timerfd/alarmtimer) so MAL timers fire from suspend.
+allow mtkmal self:capability2 wake_alarm;
+
+# PREDICTED CENSUS #3 — deliberately NOT granted:
+# - rilproxy reaching mtkrild is still expected once the internal connects
+#   succeed: sock_file write on rild's rild-mal/rild-mal-at (socket_device
+#   fallback) + rild:unix_stream_socket connectto; possibly ccci chr_file.
+# - ctl.start$volte_* sets (granted above) now hit real services
+#   (volte_daemons.te): the three daemons start and census their own skeleton
+#   domains — expect their first denials, not mtkmal's.
+# - If volte_imsm STILL does not listen with all entities live and connected,
+#   the listen waits for the Java/APK side — that would close the question in
+#   favour of "client first".
+
+# The radio daemon is a client of the MAL bus, and labelling the socket for
+# mtkmal's own use took its access away: rild logged "retrying to connect to
+# mal-mfi error 13" once a second, forever. Giving the socket a type of its own
+# was right; forgetting who else knocks on it was not.
+allow rild mtkmal_socket:sock_file write;
+allow rild mtkmal:unix_stream_socket connectto;
+
+# Клиент /dev/socket/rild-mal. Путь AT для MAL: libmal_rilproxy коннектится к
+# сокету RIL и шлёт AT-команды запросом 2106 (AT_COMMAND_WITH_PROXY), который
+# вендорский mtk-ril.so умеет сам. Без этого прокси печатает раз в секунду
+# «can't open socket : rilproxy-mal», mdmngr никогда не становится ready, и
+# каждая AT-команда получает мгновенную ошибку — отсюда пустой кэш SIM,
+# «insert abnormal = 2» и отсутствие регистрации IMS.
+allow mtkmal rild_mal_socket:sock_file write;
+allow mtkmal rild:unix_stream_socket connectto;
+
+# Клиент сокетов демона ePDG (см. file.te, epdg_wod_socket). Демон слушает все
+# три с загрузки при persist.mtk_epdg_support=1; отказ здесь и держал Epdgs(0).
+allow mtkmal epdg_wod_socket:sock_file write;
+allow mtkmal epdg_wod:unix_stream_socket connectto;

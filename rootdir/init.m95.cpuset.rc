@@ -1,0 +1,30 @@
+# Keep the Android cpusets from collapsing onto a single core.
+#
+# Rationale and measurements are in rootdir/m95-cpuset.sh; the short version is
+# that the generic init.rc writes fixed cpu masks, the kernel intersects them
+# with whatever MTK's hotplug governor has online, and on this deca-core the
+# result was every cpuset holding exactly cpu4.
+#
+# Resident, not oneshot. A single pass at `on boot` was tried first and is not
+# enough: on the 2026-08-08 build the service ran to completion and the sets
+# were still down to cpu4 a minute later, because the generic init.rc writes
+# its own fixed masks around the same moment and hotplug keeps pruning after
+# that. Triggering on sys.boot_completed is no answer either - while anything
+# earlier in the boot is broken, that property never arrives.
+#
+# The script therefore re-syncs every five seconds and never returns. That
+# interval comes from the measured decay - cores were pruned out of a freshly
+# written set within eight seconds. See the header of m95-cpuset.sh for why no
+# userspace loop can do better than mitigate this, and what the real fix is.
+
+service m95_cpuset /vendor/bin/sh /vendor/bin/m95-cpuset.sh
+    # Explicit domain: this service runs /system/bin/sh, and a file-context
+    # transition cannot serve three scripts that share one executable.
+    seclabel u:r:m95_cpuset:s0
+    class core
+    user root
+    group root
+    disabled
+
+on boot
+    start m95_cpuset

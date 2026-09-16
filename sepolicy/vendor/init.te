@@ -1,0 +1,206 @@
+# init — device-specific bits.
+
+# init mounts the MTK NV/protected partitions from fstab.mt6797 [DEV] and
+# must be able to relabel their contents once /nvdata etc. are mounted.
+# NOTE for the device tree: nothing restorecons /nvdata//nvcfg//protect_*
+# yet — init.mt6797.rc needs restorecon_recursive lines when these mounts
+# gain real content (README.md).
+allow init nvdata_file:dir { mounton create_dir_perms relabelfrom relabelto };
+allow init nvdata_file:file { getattr setattr relabelfrom relabelto };
+allow init nvcfg_file:dir { mounton create_dir_perms relabelfrom relabelto };
+allow init nvcfg_file:file { getattr setattr relabelfrom relabelto };
+allow init protect_f_data_file:dir { mounton create_dir_perms relabelfrom relabelto };
+allow init protect_s_data_file:dir { mounton create_dir_perms relabelfrom relabelto };
+
+# [CONV] m681 template: init touches these nodes during early setup.
+allow init MTK_SMI_device:chr_file { getattr relabelfrom relabelto };
+
+##########################
+# READ THIS BEFORE ADDING ANYTHING ELSE TO THIS FILE.
+#
+# Both rules below exist only because five MTK daemons never leave init's
+# domain. FACT (live device, 2026-08-10, `ps -AZ`):
+#   u:r:init:s0   255 ueventd
+#   u:r:init:s0   407 mtkmal
+#   u:r:init:s0   423 thermalloadalgod
+#   u:r:init:s0   426 thermal
+#   u:r:init:s0   429 thermald
+#
+# mtkmal was missing from an earlier version of this census and is the worst of
+# the five to lose track of. FACT: the binary is /vendor/bin/mtkmal, labelled
+# u:object_r:vendor_file:s0 (no *_exec type, so no domain_auto_trans), started
+# by /vendor/etc/init/init.mal.rc:26 `service mal-daemon` and :33
+# `service md-daemon`. That rc lives on the vendor image and is not in this
+# tree, so it cannot be given a `seclabel` from here - mtkmal needs a device
+# file_contexts entry minting an exec type plus a domain of its own.
+# It is telephony-critical (MAL = MTK modem abstraction layer / IMS-VoLTE; it
+# owns /dev/socket/{rild-mal,rild-mal-at,mal-mfi,volte_imsm}). It produced no
+# denials in the 2026-08-10 sweep only because init's domain already covers
+# everything it does - which is precisely why nobody will notice it after the
+# switch to enforcing, and why any denial it does eventually produce will be
+# printed as `init` and be indistinguishable from ueventd's or thermal's.
+#
+# ueventd is the surprising one: Pie DOES define a ueventd domain
+# (system/sepolicy/public/ueventd.te:3) and the platform init.rc DOES carry
+# `seclabel u:r:ueventd:s0` (verified present in /init.rc on the device,
+# init.rc:739-743), yet the process is still init. Something is stopping that
+# seclabel from being applied and I could not determine what statically.
+#
+# The correct fix for all five is a domain per daemon, not more power for init
+# - init is the most privileged domain on the system and every rule added here
+# is inherited by anything that fails to transition out of it. The rules below
+# are the minimum to keep the affected features working under enforcing; they
+# should be deleted and re-homed the moment those daemons get domains. In
+# particular the two rild-oem rules belong to thermal, not to init.
+
+# FACT: avc: denied { create bind read } for comm="ueventd"
+#       scontext=u:r:init:s0 tcontext=u:r:init:s0
+#       tclass=netlink_kobject_uevent_socket  permissive=1            (x32)
+#
+# This is ueventd's uevent listener - the socket it takes every hotplug,
+# firmware-load and device-add event from. Under enforcing it cannot open it,
+# so /dev stops being populated dynamically: no cold-plug of new nodes, no
+# firmware load requests serviced. That is a boot-level failure, not a
+# degradation. Permission set copied from what AOSP grants the real ueventd
+# domain (public/ueventd.te:23) so that re-homing later is a straight move.
+allow init self:netlink_kobject_uevent_socket create_socket_perms_no_ioctl;
+
+# FACT: avc: denied { write } for comm="thermal" name="rild-oem"
+#       dev="tmpfs" scontext=u:r:init:s0 tcontext=u:object_r:socket_device:s0
+#       tclass=sock_file  permissive=1                                (x24)
+#
+# The MTK thermal daemon connects to mtkrild's OEM control socket to read modem
+# temperature and ask for TX back-off. Under enforcing the connect fails and
+# thermal loses the modem as a thermal zone, so RF throttling never engages -
+# it fails silent and warm, which is the worst shape for a thermal bug.
+#
+# CORRECTION, 2026-08-10. An earlier version of this block widened the
+# pre-existing socket-creation rule to
+#   allow init socket_device:sock_file { create setattr unlink write };
+# and justified the `write` with "/dev/socket/rild-oem is created at RUNTIME by
+# mtkrild (it is declared in no rc file in this tree - grepped), so it is not
+# reachable from file_contexts". Both halves of that are wrong, and the grant it
+# excused was far wider than the denial needs. The `write` is withdrawn below
+# and replaced with a one-socket rule; the { create setattr unlink } half stays,
+# because that is a separate, older, still-necessary rule (see below).
+#
+# FACT 1: it IS declared in this tree. rootdir/init.m95.modem.rc:139 carries
+#   socket rild-oem stream 660 radio system
+# inside `service ril-daemon-mtk /vendor/bin/hw/rild` (:131). The md2 twin is
+# `socket rild-oem-md2` at :189.
+#
+# FACT 2: the live node matches that declaration exactly -
+#   srw-rw---- radio system u:object_r:socket_device:s0 /dev/socket/rild-oem
+# with the same mtime (11:12) as every other socket in that service block,
+# i.e. created by init at service start, not later by the daemon.
+#
+# FACT 3: file_contexts DOES reach init-created sockets on this device.
+# /dev/socket/rild-debug, declared on the adjacent rc line (:138), is labelled
+# u:object_r:rild_debug_socket:s0, and the only possible source of that label is
+# system/sepolicy/private/file_contexts:152. Android 9 init looks the socket
+# path up in the file_contexts handle and sets fscreate before creating the
+# node, so a device file_contexts entry is honoured at socket-creation time.
+# rild-oem simply has no entry - plat_file_contexts carries /dev/socket/rild
+# (:151) and /dev/socket/rild-debug (:152) and nothing else - so it falls
+# through to the /dev/socket default, socket_device.
+#
+# So the narrow fix is reachable today with no type_transition: sepolicy/
+# file_contexts now labels /dev/socket/rild-oem u:object_r:rild_socket:s0 (the
+# AOSP type, system/sepolicy/public/file.te:340), and init needs exactly one
+# extra permission on it. AOSP already grants init
+#   { create getattr open read setattr relabelfrom unlink }
+# on { sock_file fifo_file } for every file_type outside a short exclusion list
+# that rild_socket is not on (public/init.te:182-194) - `write` is the only
+# thing missing, because connect(2) on a unix socket checks write on the node.
+#
+# What this buys: `write` on socket_device handed init - and therefore ueventd,
+# thermal, thermald, thermalloadalgod and mtkmal, all of which sit in init's
+# domain - connect rights to EVERY local socket under /dev/socket. On this
+# device that is agpsd, agpsd2, agpsd3, mnld, mrild, mrild2, mrild3, mrild4,
+# mal-mfi, msap_uim_socket1, msap_uim_socket2 and the rest of the rild block,
+# all of them socket_device (live `ls -laZ /dev/socket`). This reaches one.
+#
+# The rild-oem-md2 twin at init.m95.modem.rc:189 is deliberately NOT labelled:
+# its service `ril-daemon-mtkmd2` (:184) is declared `disabled` (:199) and has
+# never started on this build, so there is no denial to justify the entry. If
+# md2 is ever enabled, expect this exact denial again on that socket.
+# CORRECTED after adversarial review: this originally reused the AOSP
+# rild_socket type. That was a privilege widening, not a narrowing - rild_socket
+# is already reachable by the radio/phone domain, so the label would have handed
+# the phone app the modem's OEM control channel. rild_oem_socket (sepolicy/
+# file.te) is a device type with exactly one client, /vendor/bin/thermal.
+allow init rild_oem_socket:sock_file write;
+
+# UNCHANGED, and it must stay - do not fold it into the rule above.
+# This is the older [CONV] m681-template rule and it is NOT about rild-oem: it
+# is how init creates every OTHER socket in /dev/socket that has no
+# file_contexts entry. It is needed because socket_device is a dev_type, not a
+# file_type (system/sepolicy/public/device.te:45), so AOSP's blanket
+# `allow init file_type:{ sock_file fifo_file } { create ... unlink }`
+# (public/init.te:182-194) does not reach it, and no other AOSP rule grants
+# init sock_file on a dev_type. Deleting it would stop init creating agpsd,
+# mnld, mrild1-4, mal-mfi and the rest at service start - a boot-level failure
+# that this sweep's captures could not have seen, because every one of those
+# sockets is created at 11:01/11:12 and the earliest capture window opened at
+# 12:13. `write` is deliberately absent: creating a socket node does not
+# require it, only connecting to one does.
+allow init socket_device:sock_file { create setattr unlink };
+
+# INFERENCE, not an observed denial - and stated as such on purpose.
+# connect(2) to a unix socket is two separate LSM checks: write on the sock_file
+# inode (above), and UNIX_STREAM_SOCKET__CONNECTTO from the caller to the
+# LISTENING socket's context. Only the first appears in the log. The kernel only
+# reaches the second after it has found a listener at that inode, so the most
+# likely reading is that mtkrild is not calling listen() on rild-oem at all -
+# which would also explain why thermal is still retrying on a 10 s cadence
+# (12:14:16, :26, :36, 12:17:16) 76 minutes into uptime instead of connecting
+# once. That is a separate defect from this one and is not fixed here.
+# The rule is written anyway because it costs one permission and its absence
+# would produce a second, identical-looking enforcing break on the day rild does
+# start listening. FALSIFIER: if a future capture shows thermal connecting
+# successfully with this rule absent, delete it.
+allow init rild:unix_stream_socket connectto;
+
+##########################
+# 2026-08-14 census — still-in-init daemons, follow-ups.
+#
+# STATUS UPDATE to the census at the top of this file: mtkmal now transitions
+# (mtkmal.te + file_contexts landed; ps -AZ 2026-08-14 no longer shows it in
+# init). Still in init this boot: ueventd (254), thermal (425), thermald
+# (426), thermalloadalgod (423), epdg_wod (448), plus the m95-cpuset sh.
+#
+# THE UEVENTD MYSTERY IS SOLVED — and it was never a policy problem. FACT:
+# tools/patches/init-nopolicy gates Service::Start()'s setexeccon() on the
+# g_policy_loaded global (service.cpp:318), the global is set in the FIRST
+# stage (selinux.cpp:390), and first-stage init re-execs /init — wiping every
+# global — before any service starts. So second-stage init always saw
+# `false` and silently skipped EVERY `seclabel` line: that is why ueventd
+# AND console sit in init's domain while exec-type transitions all work, and
+# why logcat's third audit record of the boot is
+#   avc: denied { execute_no_trans } path="/init" (comm init, pid 254)
+# — the ueventd exec, unlabelled. The fix (hand the flag across the re-exec
+# via the environment, like INIT_SELINUX_TOOK) is in the same patch dir; the
+# policy side needs NOTHING: sesearch confirms the base policy already grants
+#   allow ueventd init_exec:file { entrypoint execute ... };
+# so the symlink-to-/init layout transitions cleanly once setexeccon runs.
+# For that reason the ueventd-as-init denials from this census (sysfs uevent
+# writes, blk_file setattr on 7 partition types) get NO rules here: they are
+# artifacts of the init defect, the real ueventd domain already holds all of
+# it (allow ueventd sysfs_type:file w + dev_type:blk_file setattr, verified
+# by sesearch), and widening init to duplicate ueventd's powers would outlive
+# the bug it papers over.
+#
+# The thermal trio + epdg_wod now have prepared domains (thermal.te) on the
+# mtkmal pattern — exec-type transition via file_contexts, which works today.
+# The two rild-oem rules above (rild_oem_socket write, rild connectto) are
+# thereby scheduled for re-homing: thermal.te carries its own copies; delete
+# the init pair once a post-flash census shows thermal running in its domain.
+
+# Until the thermal daemons transition, their kernel-facing reads land on
+# init. FACT: { read open } /proc/driver/thermal/mdm_mdinfoex_thre (comm
+# thermal, x2) — now proc_mtk_thermal via genfs_contexts; and
+# { create bind } self:netlink_socket (comm thermalloadalgo). Both grants are
+# duplicated in thermal.te and both copies here follow the same delete-after-
+# re-homing rule as the rild-oem pair.
+allow init proc_mtk_thermal:file r_file_perms;
+allow init self:netlink_socket create_socket_perms_no_ioctl;

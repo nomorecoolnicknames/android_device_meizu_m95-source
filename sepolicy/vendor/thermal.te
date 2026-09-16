@@ -1,0 +1,85 @@
+# MTK thermal daemons + ePDG WoD — Meizu MX6 (m95), on the mtkmal.te pattern:
+# domains prepared under permissive so the census can complete them BEFORE
+# enforcing, transition via exec type in file_contexts (works today; the
+# `seclabel` route is dead until the init-nopolicy g_policy_loaded fix ships
+# — see init.te).
+#
+# WHO: /vendor/bin/{thermal,thermald,thermalloadalgod,thermal_manager}
+# started by rootdir/init.m95.thermal.rc (user system/root per stock), and
+# epdg_wod started from a vendor-image rc (like mtkmal was — no seclabel
+# reachable from this tree). FACT (ps -AZ 2026-08-14): all five ran as
+# u:r:init:s0.
+#
+# Starting sets: what the init-domain census actually attributed to them
+# (rild-oem client, /proc/driver/thermal reads, a netlink socket, policy
+# files) plus the logging basics every daemon needs. Everything else is meant
+# to arrive as a denial and be added deliberately.
+
+type thermal, domain;
+type thermal_exec, exec_type, vendor_file_type, file_type;
+type thermald, domain;
+type thermald_exec, exec_type, vendor_file_type, file_type;
+type thermalloadalgod, domain;
+type thermalloadalgod_exec, exec_type, vendor_file_type, file_type;
+type thermal_manager, domain;
+type thermal_manager_exec, exec_type, vendor_file_type, file_type;
+type epdg_wod, domain;
+type epdg_wod_exec, exec_type, vendor_file_type, file_type;
+
+init_daemon_domain(thermal)
+init_daemon_domain(thermald)
+init_daemon_domain(thermalloadalgod)
+init_daemon_domain(thermal_manager)
+init_daemon_domain(epdg_wod)
+
+# /data/.tp — libmtcloader's persisted policy selection (mkdir'd by
+# init.m95.thermal.rc post-fs-data; labelled via file_contexts).
+type thermal_data_file, file_type, data_file_type, core_data_file_type;
+
+# Logging + /dev/null, the mtkmal.te expansion of logd_client().
+allow { thermal thermald thermalloadalgod thermal_manager epdg_wod } pmsg_device:chr_file w_file_perms;
+allow { thermal thermald thermalloadalgod thermal_manager epdg_wod } logdw_socket:sock_file write;
+allow { thermal thermald thermalloadalgod thermal_manager epdg_wod } logd:unix_dgram_socket sendto;
+allow { thermal thermald thermalloadalgod thermal_manager epdg_wod } null_device:chr_file rw_file_perms;
+
+# Kernel thermal surface: /proc/driver/thermal (typed in file.te) and the
+# /sys/class/thermal tree (generic sysfs on this kernel) — the daemons both
+# read zone temps and write cooling-state/policy knobs.
+allow { thermal thermald thermalloadalgod thermal_manager } proc_mtk_thermal:file rw_file_perms;
+allow { thermal thermald thermalloadalgod thermal_manager } proc_mtk_thermal:dir r_dir_perms;
+allow { thermal thermald thermalloadalgod thermal_manager } sysfs:dir r_dir_perms;
+allow { thermal thermald thermalloadalgod thermal_manager } sysfs:file rw_file_perms;
+
+# Tuned policy files under /vendor/etc/.tp (vendor_file) and the persisted
+# selection under /data/.tp.
+r_dir_file(thermal, vendor_file)
+r_dir_file(thermald, vendor_file)
+r_dir_file(thermal_manager, vendor_file)
+allow { thermal thermald thermal_manager } thermal_data_file:dir create_dir_perms;
+allow { thermal thermald thermal_manager } thermal_data_file:file create_file_perms;
+
+# Modem thermal zone: thermal is the rild-oem client (re-homed from init.te —
+# the socket write plus the connectto INFERENCE documented there, kept for
+# the same reason).
+allow thermal rild_oem_socket:sock_file write;
+allow thermal socket_device:dir search;
+allow thermal rild:unix_stream_socket connectto;
+
+# thermalloadalgod's kernel event feed. FACT (as init): { create bind }
+# self:netlink_socket.
+allow thermalloadalgod self:netlink_socket create_socket_perms_no_ioctl;
+
+# epdg_wod census, 2026-08-25, after the daemon was first allowed to live
+# (persist.mtk_epdg_support=1). Verbatim from the enforcing boot:
+#   denied { write } name="ipsec" tcontext=system_data_file tclass=dir   x20
+#   denied { read }  name="wo"    tcontext=system_data_file tclass=dir   x10
+#   denied { dac_override } / { dac_read_search }  tclass=capability     x10 each
+#   denied { read write } name="11"/"0" tcontext=devpts tclass=chr_file  x2
+# The dir denials are its own working directory, now typed above. The
+# capability pair was reported alongside, but granting it is forbidden by a
+# platform neverallow (system/sepolicy/public/domain.te:1385/1393 -- the build
+# refuses the policy outright), and it is not needed: the daemon is root and
+# the dirs are root-owned 0700, so DAC passes on its own once MAC allows the
+# dir. devpts is the pty it inherits as stdio from init; harmless, not granted.
+allow epdg_wod epdg_wod_data_file:dir create_dir_perms;
+allow epdg_wod epdg_wod_data_file:file create_file_perms;

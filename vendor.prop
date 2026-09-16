@@ -1,0 +1,131 @@
+# vendor.prop — Meizu MX6 (m95) on LineageOS 18.1.
+# Ported from LOS16 system.prop (values VERBATIM stock Flyme 8.0.5.0A
+# build.prop unless noted). ro.* / persist.vendor.* / MTK blob flags belong
+# to the vendor partition under R split-property rules.
+#
+
+# Panel density (FACT: 1080x1920 5.5" -> xxhdpi 480).
+ro.sf.lcd_density=480
+
+# HAL suffixes — all stock HALs are *.mt6797.so (FACT, blob set).
+ro.hardware.gralloc=mt6797
+ro.hardware.hwcomposer=mt6797
+ro.hardware.camera=mt6797
+ro.hardware.sensors=mt6797
+
+# RIL (VERBATIM stock build.prop; rild loads mtk-ril.so, IRadio 1.1 live).
+rild.libpath=mtk-ril.so
+rild.libargs=-d /dev/ttyC0
+ro.telephony.default_network=10,10
+persist.radio.multisim.config=dsds
+ro.telephony.sim.count=2
+
+# Modem-type selectors the MTK radio blobs gate on (VERBATIM stock).
+# gsm0710muxd needs opt_md1_support (else /dev/radio/ptty* never exist);
+# ccci_mdinit needs opt_md3_support (else MD3/C2K never boots).
+ro.boot.opt_md1_support=12
+ro.boot.opt_md3_support=2
+ro.boot.opt_lte_support=1
+ro.boot.opt_irat_support=1
+ro.boot.opt_c2k_support=1
+ro.boot.opt_c2k_lte_mode=2
+ro.boot.opt_eccci_c2k=1
+ro.boot.opt_using_default=1
+
+# RAT steering (VERBATIM stock build.prop:317-321).
+persist.radio.mtk_ps2_rat=W/G
+persist.radio.mtk_ps3_rat=G
+persist.radio.mtk_dsbp_support=1
+ro.mtk_md_sbp_custom_value=0
+
+# MTK telephony mode flags (VERBATIM stock; rild.libpath lives in device.mk).
+ril.first.md=1
+ril.external.md=0
+ril.telephony.mode=0
+mtk.eccci.c2k=enabled
+ro.mtk_c2k_support=1
+ro.mtk_enable_md3=1
+
+# MAL -> rild socket (bypasses disabled ril-proxy; see LOS16 notes).
+ril.mal.socket=rild-mal
+
+# IMS/VoLTE gates (measured 2026-08-18..26, see LOS16 system.prop notes).
+persist.mtk_ims_support=1
+persist.mtk_volte_support=1
+persist.mtk.volte.enable=1
+persist.vendor.mtk.volte.enable=1
+persist.mtk_epdg_support=0
+
+# MTK feature flags with direct blob evidence (VERBATIM stock values).
+ro.mtk_clearmotion_support=1
+ro.mtk_deinterlace_support=1
+ro.mtk_trustonic_tee_support=1
+ro.mtk_pq_support=3
+ro.mtk_pq_color_mode=1
+
+# Wi-Fi: never pin BSSID (FACT: MTK gen3 cannot join fixed-BSSID, A/B 2026-08-14).
+ro.vendor.wifi.connect_ssid_only=1
+
+# MtkCam log gate: level 0 (FACT: level 3 starves 3A by ~280 frames).
+persist.mtk.camera.log_level=0
+
+# Camera HAL version. camera.mt6797.so reads this and reports device_version
+# 0x303 (Camera2 HAL 3.3) instead of 0x100 for both sensors. It is the LOS16
+# setting too, but there it lived in rootdir/default.prop, which A11 never
+# installs -- on 18.1 the property was empty, both cameras came up as
+# device@1.0, and the legacy path crashed the provider: MTK's DisplayClient
+# recovers an ANativeWindowBuffer by subtracting the N handle offset from what
+# preview_stream_ops::dequeue_buffer returned, while the Treble HAL1 wrapper
+# (hardware/interfaces/camera/device/1.0/default/CameraDevice.cpp) returns a
+# pointer into its mCirculatingBuffers map, so common.incRef was garbage
+# (FACT, tombstone 2026-09-07 15:00:11, pc=0 in NSDisplayClient::StreamImgBuf).
+# HAL3 does not use DisplayClient at all.
+debug.camera.force_device=3
+
+# Full-resolution stills. FACT (dumpsys media.camera, 2026-09-07 16:45): the HAL
+# advertises BLOB/JPEG up to 4096x3072 but caps YCbCr_420_888 at 1920x1088, and
+# the AOSP camera app's CaptureModule captures YUV and encodes the JPEG itself
+# (CAM_JpegUtilNative "Compressing jpeg with size = (1920, 1088)"), so the
+# vendor YUV ceiling is the real picture-size ceiling -- 1088x1450 after crop.
+# offerLargeYuvSizes() in CameraModule.cpp adds 4096x3072 / 3264x2448 /
+# 2560x1920 YUV rows for the rear module and 2592x1944 for the front one, at a
+# published 30 fps so getOutputSizes() shows them (anything slower than 20 fps
+# the framework hides in getHighResolutionOutputSizes, which this app never
+# asks). Paired with the checkStream blob patch, without which the vendor's own
+# validator rejects the sizes it does not carry in tag 0xd000a.
+persist.camera.big_yuv=1
+
+# Log suppression for known blob floods (FACT, measured on device).
+log.tag.AudioParamParser=S
+log.tag.SensorHAL=I
+
+# wmt_launcher fwlog default (blob assumes 0 when absent).
+persist.mtk.wcn.fwlog.status=0
+
+# adbd transport: this 3.18 f_fs.c has no AIO at all (zero aio/io_submit
+# references), so the R nonblocking path (io_submit on ep files) can never
+# work. Force the legacy sync path (usb.cpp: ro.adb.nonblocking_ffs) AND the
+# non-AIO read/write inside it (usb_legacy.cpp: sys.usb.ffs.aio_compat).
+# init.mt6797.usb.rc sets the second one at early-init as well.
+ro.adb.nonblocking_ffs=false
+sys.usb.ffs.aio_compat=1
+
+# Bluetooth: CONSYS FW advertises LE Data Length Extension (LE features byte0
+# bit 0x20) but returns "Unknown HCI Command" for LE Read Maximum Data Length;
+# the R stack then hangs in controller start-up (strace 2026-09-06). The
+# bluetooth@1.0-impl quirk (hardware/interfaces) masks the bit.
+ro.vendor.bt.le_features_mask0=0xdf
+
+# Audio: the legacy HAL blob (audio.primary.mt6797.so) is a Nougat build --
+# Flyme 8.0.5.0A is Android 7.1.1 (NMF26O) -- and its audio_hw_device /
+# audio_stream_in / audio_stream_out end before the fields the >= 4.0 HIDL
+# wrappers need. Reading them is an out-of-bounds read (get_microphones would
+# even call the blob's dump() through the wrong slot), so those wrapper methods
+# report NOT_SUPPORTED when this is set; see the guard in
+# hardware/interfaces/audio/core/all-versions/default/Util.h. Needed to run
+# audio@6.0, which Android 13 requires (it knows 7.1/7.0/6.0/5.0/4.0 only).
+ro.vendor.audio.legacy_nougat_abi=1
+
+# A13 GSI (Flyme 13) поверх нашего vendor: Mali r12p0 (Nougat) роняет каждое задание Skia-GL
+# (mali: Unhandled Page fault, ~100 за 8 с, кадр чёрный); legacy GLES RenderEngine — 0 фолтов (2026-09-11)
+debug.renderengine.backend=gles

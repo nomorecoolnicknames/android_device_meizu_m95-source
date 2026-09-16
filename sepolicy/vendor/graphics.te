@@ -1,0 +1,88 @@
+# Graphics stack: Mali-T880 (libGLES_mali) + mtkfb/hwcomposer.mt6797 +
+# gralloc.mt6797 running inside the generic Pie passthrough HAL services
+# (device.mk packages allocator@2.0/composer@2.1/mapper@2.0). Device node
+# names are [DEV] (ueventd + kernel); the exact set of nodes each blob opens
+# is [CONV] until first-boot denials confirm it.
+
+# gralloc.mt6797 in the allocator service
+allow hal_graphics_allocator_default graphics_device:chr_file rw_file_perms;
+allow hal_graphics_allocator_default gpu_device:chr_file rw_file_perms;
+allow hal_graphics_allocator_default ion_device:chr_file rw_file_perms;
+allow hal_graphics_allocator_default MTK_SMI_device:chr_file rw_file_perms;
+allow hal_graphics_allocator_default mtk_m4u_proc:file rw_file_perms;
+
+# hwcomposer.mt6797 in the composer service
+allow hal_graphics_composer_default graphics_device:chr_file rw_file_perms;
+allow hal_graphics_composer_default gpu_device:chr_file rw_file_perms;
+allow hal_graphics_composer_default ion_device:chr_file rw_file_perms;
+allow hal_graphics_composer_default sw_sync_device:chr_file rw_file_perms;
+allow hal_graphics_composer_default MTK_SMI_device:chr_file rw_file_perms;
+allow hal_graphics_composer_default mtk_m4u_proc:file rw_file_perms;
+
+# surfaceflinger with the Mali client driver [CONV: mt6755-common template]
+allow surfaceflinger MTK_SMI_device:chr_file rw_file_perms;
+allow surfaceflinger sw_sync_device:chr_file rw_file_perms;
+allow surfaceflinger mtk_m4u_proc:file rw_file_perms;
+
+##########################
+# /proc/ged — 2026-08-14 census (captures/m95-sepolicy-20260814/).
+# The MTK GED node is ioctl'd by the whole GPU stack; on the generic `proc`
+# label none of these domains may touch it. FACT, observed ioctlcmds by domain:
+#   hal_graphics_composer_default  0x6701/0x6765/0x6767  (x29)
+#   hal_graphics_allocator_default 0x6764                (x10)
+#   surfaceflinger                 0x6700/0x6765/0x6767 + read/open (x13)
+#   bootanim                       0x6704/0x6767         (x8, comm ged-swd)
+#   system_server                  0x6765                (x2, android.anim)
+# Under enforcing every GED query fails with EACCES: the fdvsync/swd path
+# degrades and GPU frequency hinting is lost, silently. No allowxperm rules
+# are written on purpose: with no xperm entry for a pair the base ioctl
+# permission is unrestricted, and this kernel's xperm translation is exactly
+# the defect documented in ioctl_xperms.te — adding command filters here
+# would turn these grants into deny-all until the kernel fix is flashed.
+allow hal_graphics_composer_default proc_ged:file r_file_perms;
+allow hal_graphics_allocator_default proc_ged:file r_file_perms;
+allow surfaceflinger proc_ged:file r_file_perms;
+allow bootanim proc_ged:file r_file_perms;
+allow system_server proc_ged:file r_file_perms;
+
+# The composer sets debug.hwc.* / debug.sf.* tuneables (FACT: denial pair
+# property_socket write + init connectto at 01:24:12; the only property
+# prefixes in strings of hwcomposer.mt6797.so are debug.hwc.* and
+# debug.sf.sw_vsync_fps, both u:object_r:debug_prop:s0 in the Pie base
+# property_contexts). set_prop expands to both halves of the denial.
+set_prop(hal_graphics_composer_default, debug_prop)
+
+# MTK GuiExt: the composer registers GuiExtService on vndbinder (FACT:
+# { add } on what fell through to default_android_vndservice, 2026-08-14;
+# now labelled guiext_service via vndservice_contexts).
+# R-SPLIT: vendor add to servicemanager violates (Treble registers via
+# hwservicemanager); find stays, add returns with the decode phase.
+allow hal_graphics_composer_default guiext_service:service_manager find;
+
+# Round 23 -- composer HAL on the framework binder domain.
+#
+# FACT (thread dump, 2026-08-16): the GuiExt pool inside the conventional
+# composer HAL calls SurfaceComposerClient::getBuiltInDisplay(), which goes
+# through ComposerService::connectLocked() -- an unbounded retry loop around
+# getService("SurfaceFlinger"). On /dev/vndbinder that name does not exist
+# (`vndservice list` returns GuiExtService and nothing else, while
+# `service list` has SurfaceFlinger at 127), so the loop never ends and the
+# video decoder deadlocks behind the binder call it made into this HAL.
+#
+# With ro.vendor.binder.framework_domain=1 this service uses /dev/binder, so
+# it needs the framework binder plumbing and the ability to find
+# SurfaceFlinger.
+#
+# CORRECTION 2026-09-09 (enforcing lane). The old note here said this was legal
+# only because PRODUCT_FULL_TREBLE_OVERRIDE is false and the full_treble_only
+# neverallows are compiled out. Both halves are wrong on 18.1:
+# BoardConfig.mk:113 sets it to true, and the neverallows are present in the
+# compiled policy (counted in plat_sepolicy.cil). The three rules below are
+# nonetheless legal, and for a better reason -- they are a VENDOR domain
+# (hal_graphics_composer_default) using the framework binder and finding a
+# framework service, which no neverallow forbids; what the treble rules forbid
+# is the mirror image, a CORE domain on vndbinder (see surfaceflinger.te).
+# Verified the only way that counts: m selinux_policy passes with them in.
+binder_use(hal_graphics_composer_default)
+binder_call(hal_graphics_composer_default, surfaceflinger)
+allow hal_graphics_composer_default surfaceflinger_service:service_manager find;

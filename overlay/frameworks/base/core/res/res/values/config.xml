@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Meizu MX6 (m95) — framework overlay, LineageOS 18.1 (Android 11).
+    Пока здесь только гейт платформы VoLTE.
+-->
+<resources>
+    <!-- Вторая половина конъюнкции в ImsManager.isVolteEnabledByPlatform():
+         persist.dbg.volte_avail_ovr (system.prop) закорачивает проверку раньше,
+         но при снятом оверрайде платформенный гейт обязан быть верным.
+         Значение по умолчанию в AOSP — false (frameworks/base/core/res/res/
+         values/config.xml:2868). -->
+    <bool name="config_device_volte_available">true</bool>
+</resources>

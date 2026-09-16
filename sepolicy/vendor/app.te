@@ -1,0 +1,15 @@
+# App-domain device extras — Meizu MX6 (m95).
+#
+# /proc/ged, FACT (2026-08-14 census): every hardware-accelerated app process
+# ioctl's the MTK GED node from its RenderThread —
+#   avc: denied { ioctl } path="/proc/ged" ioctlcmd=6767
+#        scontext=u:r:platform_app:s0 (x26) / u:r:priv_app:s0 (x6)
+# Only { ioctl } was ever audited for app domains, which means the fd reaches
+# the app without an open denial (most plausibly created by the GL stack
+# before the app's first frame); open/read/getattr are granted with it anyway
+# because a per-process GPU fd that cannot be reopened after the driver
+# reinitialises is a latent breakage of exactly the kind permissive hides.
+# untrusted_app is included deliberately: any GLES game hits the same path;
+# isolated_app is not.
+# No allowxperm — see the kernel xperm defect note in ioctl_xperms.te.
+allow { appdomain -isolated_app } proc_ged:file { getattr open read ioctl };

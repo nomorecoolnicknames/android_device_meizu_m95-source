@@ -1,0 +1,41 @@
+# GPS: gps.mt6797 (in gnss@1.0-service) talks to the mnld daemon over UDP
+# datagram sockets bound in /data (paths from strings of vendor/bin/mnld
+# [DEV]: /data/gps_mnl, /data/agps_supl, /data/mpe_mnl, /data/misc/gps).
+# mnld/mtk_agpsd are NOT started by our init yet; domains prepared. All allow
+# rules [CONV] until denials confirm.
+
+type mnld, domain;
+type mtk_agpsd, domain;
+init_daemon_domain(mnld)
+init_daemon_domain(mtk_agpsd)
+
+# mnld — MTK GPS driver daemon
+allow mnld stpgps_device:chr_file rw_file_perms;
+allow mnld stpwmt_device:chr_file rw_file_perms;
+allow mnld mnld_data_file:dir create_dir_perms;
+allow mnld mnld_data_file:file create_file_perms;
+allow mnld mnld_data_file:sock_file create_file_perms;
+# GPS calibration under /data/nvram [DEV: path string in the mnld binary]
+r_dir_file(mnld, nvdata_file)
+allow mnld nvdata_file:file rw_file_perms;
+set_prop(mnld, mnld_prop)
+get_prop(mnld, wmt_prop)
+allow mnld self:unix_dgram_socket { create_socket_perms sendto };
+allow mnld hal_gnss_default:unix_dgram_socket sendto;
+allow mnld mtk_agpsd:unix_dgram_socket sendto;
+
+# mtk_agpsd — AGPS/SUPL daemon (needs the network)
+net_domain(mtk_agpsd)
+allow mtk_agpsd mnld_data_file:dir create_dir_perms;
+allow mtk_agpsd mnld_data_file:file create_file_perms;
+allow mtk_agpsd mnld_data_file:sock_file create_file_perms;
+allow mtk_agpsd mnld:unix_dgram_socket sendto;
+
+# gnss HAL side
+allow hal_gnss_default stpgps_device:chr_file rw_file_perms;
+allow hal_gnss_default mnld_data_file:dir create_dir_perms;
+allow hal_gnss_default mnld_data_file:file create_file_perms;
+allow hal_gnss_default mnld_data_file:sock_file create_file_perms;
+allow hal_gnss_default mnld:unix_dgram_socket sendto;
+allow hal_gnss_default self:unix_dgram_socket create_socket_perms;
+get_prop(hal_gnss_default, mnld_prop)

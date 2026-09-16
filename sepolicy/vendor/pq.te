@@ -1,0 +1,52 @@
+# MTK picture-quality daemon, /vendor/bin/pq.
+#
+# [DEV] The binary ships and is listed in proprietary-files.txt:678. Nothing in
+# our init started it until init.mt6797.rc gained a property-gated service, so
+# the camera provider logged getAshmemContext / getPQSession failures on every
+# frame - 10592 in one measured window, dropping to zero the moment pq runs.
+#
+# Everything below is [CONV] until a run under enforcing produces denials: it was
+# derived from the binary's own strings and from what the m681 template grants,
+# not from observed audit records. The live test that proved pq works ran it as
+# root under permissive, which is not this configuration.
+
+type pq, domain;
+type pq_exec, exec_type, vendor_file_type, file_type;
+init_daemon_domain(pq)
+
+# [DEV] /dev/mtk_disp_mgr is the only device path in libpqservice.so, and it is
+# already labelled graphics_device by file_contexts:74 (/dev/mtk_disp.*).
+allow pq graphics_device:chr_file rw_file_perms;
+
+# It registers a binder service ("PQService" appears in libpqservice.so, with
+# interface descriptor IPQService) and the camera provider looks it up.
+binder_use(pq)
+binder_service(pq)
+
+# The name, finally observed (2026-08-16). The note that used to sit here said
+# not to guess it and to read it off a running device before switching to
+# enforcing. That switch happened, and the predicted failure happened with it:
+#
+#   avc: denied { add } for service=PQ pid=418 uid=1000 scontext=u:r:pq:s0
+#        tcontext=u:object_r:default_android_service:s0 tclass=service_manager
+#
+# The registered name is "PQ", not "PQService" -- the C++ class name was indeed
+# the wrong guess, so refusing to write it into the policy was right.
+#
+# Cost of the missing entry, measured: the camera provider retried the lookup
+# on every frame and logged 15286 lines in one 60-second window, 8274 of them
+# "PQ Service is not ready" plus 7012 "getAshmemContext failed". That was the
+# single largest source of log noise on the device once akm_log was fixed.
+#
+# Worth noting where the denial was visible: in logcat via auditd, and NOT in
+# dmesg -- the kernel ring showed zero denials before and after. So a census
+# taken from dmesg alone misses service_manager denials, and one taken from
+# logcat alone misses the kernel ones. Both have to be read.
+allow pq pq_service:service_manager add;
+
+# Consumers. hal_camera_default is the observed one; surfaceflinger and the
+# settings/system apps reach PQ for display tuning through the same service.
+allow hal_camera_default pq_service:service_manager find;
+allow surfaceflinger pq_service:service_manager find;
+allow system_app pq_service:service_manager find;
+allow platform_app pq_service:service_manager find;

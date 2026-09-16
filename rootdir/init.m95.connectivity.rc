@@ -1,0 +1,177 @@
+# init.m95.connectivity.rc — MTK WMT combo chip (Wi-Fi/BT/GPS/FM on the
+# MT6797 integrated CONSYS) + GPS daemons.
+#
+# Firmware: wmt_launcher -p /vendor/firmware/ — WMT_SOC.cfg,
+# ROMv3_patch_1_{0,1}_hdr.bin and WIFI_RAM_CODE_6797 verified present in
+# vendor/meizu/m95/proprietary/vendor/firmware and installed by
+# m95-vendor.mk. [DEV]
+#
+# Device-node perms (/dev/stpwmt, /dev/wmtdetect, /dev/wmtWifi, /dev/stpbt,
+# /dev/stpgps, /dev/fm) are handled by ueventd.mt6797.rc, not here. [DEV]
+#
+# CORRECTION 2026-08-09: this file used to say wpa_supplicant was deliberately
+# not ported "because Pie ships its own HIDL wpa_supplicant service". That is
+# false in this tree, and Wi-Fi was dead because of it.
+#
+#   grep "^service wpa_supplicant" across /init*.rc, /vendor/etc/init/*.rc and
+#   /system/etc/init/*.rc on the device -> nothing. getprop init.svc.wpa_supplicant
+#   -> empty, i.e. init has never heard of the service. Meanwhile the binary is
+#   installed and 2.4 MB of it: /vendor/bin/hw/wpa_supplicant.
+#
+# The reason nothing declares it is that external/wpa_supplicant_8/wpa_supplicant
+# in this tree contains NO .rc file at all and its module carries no
+# LOCAL_INIT_RC (Android.mk:1690) - the init service is the device tree's job
+# here, not the platform's. So wificond asked init to start a service that did
+# not exist:
+#   init: Received control message 'start' for 'wpa_supplicant' from pid 442
+#   E WifiNative: Failed to start supplicant
+#   E WifiClientModeManager: Failed to create ClientInterface. Sit in Idle
+#   D WifiStateMachinePrime: ClientMode failed, return to WifiDisabledState
+# and wlan0 stayed DOWN forever.
+#
+# Still deliberately NOT ported (details in INIT_SERVICES.md): p2p_supplicant,
+# stp_dump3, wmt_concurrency, MPED, wifi2agps, slpd (no sepolicy domain and/or
+# no stock service definition).
+
+on post-fs-data
+    # wpa_supplicant's control sockets. Pie moved these from /data/misc/wifi to
+    # /data/vendor/wifi, and nothing in this ROM creates them: /data/vendor/wifi
+    # exists but holds only hostapd/, and init.rc has no mkdir for the wpa path.
+    mkdir /data/vendor/wifi 0770 wifi wifi
+    mkdir /data/vendor/wifi/wpa 0770 wifi wifi
+    mkdir /data/vendor/wifi/wpa/sockets 0770 wifi wifi
+
+    # BT/FM/GPS shared UART [DEV: stock init.connectivity.rc:11-12]
+    chmod 0660 /dev/ttyMT2
+    chown system system /dev/ttyMT2
+
+    # GPS power control sysfs [DEV: kernel/m685
+    # drivers/misc/mediatek/connectivity/gps/gps.c:971 class_create("gpsdrv")]
+    chown gps gps /sys/class/gpsdrv/gps/pwrctl
+    chown gps gps /sys/class/gpsdrv/gps/suspend
+    chown gps gps /sys/class/gpsdrv/gps/state
+    chown gps gps /sys/class/gpsdrv/gps/pwrsave
+    chown gps gps /sys/class/gpsdrv/gps/status
+
+    # mnld/agpsd data + socket dirs [DEV: paths from strings on
+    # vendor/bin/mnld (/data/gps_mnl/*, /data/misc/gps/*, /data/agps_supl/*)
+    # + stock init.connectivity.rc:16-18; labelled mnld_data_file in sepolicy]
+    mkdir /data/gps_mnl 0771 gps system
+    mkdir /data/misc/gps 0770 gps system
+    mkdir /data/agps_supl 0771 gps system
+    mkdir /data/mpe_mnl 0771 gps system
+
+    # BD address nvram record is root:3008 0660 from stock; AID 3008
+    # (net_bt_stack) no longer exists in Pie, and the BT HAL process
+    # (user bluetooth, no supplementary groups) reads it through libnvram
+    # [DEV: /nvdata/APCFG/APRDEB/BT_Addr on device; libbluetooth_mtk.so
+    # NEEDED libnvram.so]. Regroup it so the HAL can read its BD address.
+    chown root bluetooth /data/nvram/APCFG/APRDEB/BT_Addr
+    chmod 0660 /data/nvram/APCFG/APRDEB/BT_Addr
+
+##############################
+# WMT: wmt_loader probes the combo chip via /dev/wmtdetect and exits;
+# wmt_launcher stays resident feeding firmware patches via /dev/stpwmt
+# [FACT: node paths in strings on both blobs]. Wi-Fi/BT/GPS/FM power-on all
+# fail without these two.
+##############################
+
+# [DEV: stock init.connectivity.rc:51-55]
+service wmt_loader /vendor/bin/wmt_loader
+    class core
+    user root
+    group root
+    oneshot
+
+# [DEV: stock init.connectivity.rc:57-60]
+service wmt_launcher /vendor/bin/wmt_launcher -p /vendor/firmware/
+    class core
+    user system
+    group system
+
+##############################
+# GPS daemons — domains mnld / mtk_agpsd prepared in sepolicy/gnss.te.
+# The gps.mt6797.so HAL talks to mnld over the mnld socket.
+##############################
+
+# [DEV: stock init.connectivity.rc:73-77]
+service mnld /vendor/bin/mnld
+    class main
+    user gps
+    group gps inet misc sdcard_rw sdcard_r media_rw system radio
+    socket mnld stream 660 gps system
+
+# AGPS/SUPL [DEV: stock init.mt6797.rc:1159-1165; service name "agpsd" is
+# stock — the sepolicy domain (mtk_agpsd) binds via the exec label, not the
+# service name]
+service agpsd /vendor/bin/mtk_agpsd
+    class main
+    socket agpsd stream 660 gps system
+    socket agpsd2 stream 660 gps inet
+    socket agpsd3 stream 660 gps inet
+    user gps
+    group gps radio inet sdcard_r sdcard_rw misc system
+
+##############################
+# Bluetooth local address.
+#
+# Pie's BT HAL looks for the local address in ro.bt.bdaddr_path (a file, in
+# ASCII), then ro.boot.btmacaddr, then persist.service.bdroid.bdaddr, and its
+# caller does LOG_ALWAYS_FATAL("No Bluetooth Address!") when all three miss.
+# All three are unset here, and stock does not set them either - the Flyme
+# stack read MTK NVRAM directly and never needed a property.
+#
+# The factory address is in NVRAM and is valid (first six bytes of
+# /data/nvram/APCFG/APRDEB/BT_Addr; see rootdir/m95-bdaddr.sh for how that is
+# established). This publishes it into the property the HAL can actually see.
+#
+# post-fs-data because /data must be mounted; the HAL reads the address when
+# Bluetooth is enabled rather than at boot, so this is comfortably early. The
+# BT_Addr chown two blocks above has to have run first, which it does - same
+# trigger, earlier in the file.
+##############################
+
+service m95_bdaddr /vendor/bin/sh /vendor/bin/m95-bdaddr.sh
+    # Explicit domain: this service runs /system/bin/sh, and a file-context
+    # transition cannot serve three scripts that share one executable.
+    seclabel u:r:m95_bdaddr:s0
+    class core
+    user root
+    group root bluetooth
+    oneshot
+    disabled
+
+on property:vold.post_fs_data_done=1
+    start m95_bdaddr
+
+##############################
+# wpa_supplicant.
+#
+# Declared here because this tree's external/wpa_supplicant_8 ships no .rc and
+# no LOCAL_INIT_RC - see the correction at the top of this file. Without this
+# block wificond's "ctl.start wpa_supplicant" reaches an undefined service and
+# Wi-Fi can never leave WifiDisabledState.
+#
+# Shape follows /vendor/etc/init/hostapd.android.rc, the Pie-era sibling that
+# this ROM does install, rather than the m681 port's LOS 15.1 definition: Pie
+# needs the HIDL interface declarations so hwservicemanager can resolve the
+# service, and the control sockets moved to /data/vendor/wifi.
+#
+# Both interface versions are declared because the binary implements both - it
+# links android.hardware.wifi.supplicant@1.0 and @1.1 (Android.mk:1726-1727)
+# and carries both hidl/1.0 and hidl/1.1 implementations. The matching
+# <hal> entry is in manifest.xml; hwservicemanager rejects registrations of
+# undeclared HALs, which is what killed every vendor HIDL service earlier in
+# this port.
+##############################
+
+service wpa_supplicant /vendor/bin/hw/wpa_supplicant \
+    -O/data/vendor/wifi/wpa/sockets -puse_p2p_group_interface=1 \
+    -g@android:wpa_wlan0
+    interface android.hardware.wifi.supplicant@1.0::ISupplicant default
+    interface android.hardware.wifi.supplicant@1.1::ISupplicant default
+    class main
+    socket wpa_wlan0 dgram 660 wifi wifi
+    group system wifi inet
+    disabled
+    oneshot

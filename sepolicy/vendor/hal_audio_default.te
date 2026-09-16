@@ -1,0 +1,87 @@
+# audio.primary.mt6797 inside audio@2.0-service.
+# The CCCI voice-call PCM nodes are labelled audio_device (see file_contexts,
+# matching stock ueventd ownership audio:audio [DEV]); base policy already
+# grants hal_audio audio_device. Extras below are [CONV].
+
+r_dir_file(hal_audio_default, nvdata_file)
+allow hal_audio_default nvdata_file:file rw_file_perms;
+allow hal_audio_default sysfs:file r_file_perms;
+allow hal_audio_default sysfs_dev_info:file r_file_perms;
+
+##########################
+# DELIBERATELY LEFT DENIED — /sdcard/.audio_param. NO RULE, ON PURPOSE.
+#
+# FACT (live device, 2026-08-10, seen by all four provocation sweeps, on a 1 Hz
+# retry loop that never stops):
+#   avc: denied { search } scontext=u:r:hal_audio_default:s0
+#        tcontext=u:object_r:storage_file:s0  tclass=dir  name="default"
+#   avc: denied { read }   ... tcontext=u:object_r:storage_file:s0
+#        tclass=lnk_file  name="primary"
+#   avc: denied { search } ... tcontext=u:object_r:mnt_user_file:s0
+#        tclass=dir  name="user"
+#   avc: denied { read }   ... tcontext=u:object_r:mnt_user_file:s0
+#        tclass=lnk_file  name="primary"
+#   avc: denied { search } ... tcontext=u:object_r:sdcardfs:s0
+#        tclass=dir  name="/"
+#
+# This is AudioParamParser looking for /sdcard/.audio_param. Allowing it would
+# switch ON MediaTek's drop-an-XML-on-the-sdcard-and-retune-the-audio-HAL hook,
+# which commit 94f9e1e examined and refused on security grounds — any process
+# that can write external storage would be able to reconfigure the audio HAL.
+# rootdir/default.prop:125 carries the same instruction ("DO NOT fix this by
+# giving the HAL sdcard_rw/media_rw").
+#
+# The enforcing behaviour is the DESIRED behaviour, which is why this is the one
+# denial in the sweep that must survive it: under enforcing the search fails
+# hard, the parser stops retrying, and the 1 Hz log flood ends by itself. The
+# rule to write here is no rule.
+#
+# 2026-08-14: dontaudit added below — it is NOT an allow. The access stays
+# denied (identical enforcing outcome), only the audit record is suppressed,
+# which also works under permissive and removes the ~9 avc lines/min this loop
+# prints today (audio lane count, dmesg window 12:54-12:55). If this path ever
+# needs re-examination, comment the dontaudit lines out and the denials
+# reappear.
+dontaudit hal_audio_default { storage_file mnt_user_file sdcardfs }:dir search;
+dontaudit hal_audio_default { storage_file mnt_user_file }:lnk_file read;
+#
+# NOT to be confused with the camera provider's /sdcard/shading rules in
+# sepolicy/hal_camera_default.te. That path is a factory lens-shading cache the
+# HAL reads and rewrites under fixed filenames; this one is an arbitrary
+# configuration file that reconfigures a HAL. Same filesystem, opposite call.
+#
+# ALSO OBSERVED FROM THIS DOMAIN, ALSO LEFT DENIED:
+#   avc: denied { call } for comm="writer" pid=927
+#        scontext=u:r:hal_audio_default:s0 tcontext=u:r:servicemanager:s0
+#        tclass=binder  permissive=1                                     (x1)
+# One occurrence, at stream-out setup, and playback succeeded anyway.
+# REJECTED hypothesis: BatteryNotifier/noteStartAudio — all 112 mapped libs of
+# pid 927 were scanned for batterystats|BatteryNotifier|noteStartAudio with zero
+# hits, and the only *ServiceManager hit is
+# android::hardware::defaultServiceManager (the hwservicemanager one), which is
+# not the legacy manager this denial names.
+# 2026-08-14: callee IDENTIFIED by the sepolicy-lane census
+# (captures/m95-sepolicy-20260814/): the same domain also logs
+#   avc: denied { find } for hal_audio_default
+#        → audioserver_service:service_manager                          (x2)
+# so the lookup target is audioserver (AudioFlinger) via the legacy binder
+# servicemanager — an MTK-blob N-era pattern. The earlier HYPOTHESIS that
+# `writer` is the sdcard audio-param thread is CLOSED by this: the target is a
+# real framework service, not storage. The gap the previous note refused to
+# write a rule into is now filled with a named callee, so the rules below are
+# written.
+#
+# CORRECTION 2026-09-09 (enforcing lane). The old text said these compile
+# because "ro.treble.enabled is false on this build" -- it is TRUE
+# (system/build.prop:74 of the built image; BoardConfig.mk:113 sets
+# PRODUCT_FULL_TREBLE_OVERRIDE := true), so that full_treble_only() block is
+# live. They compile anyway, for a reason that does not depend on the branch:
+# the neverallow there targets { appdomain -coredomain }, i.e. vendor APPS, and
+# hal_audio_default is a HAL domain, not an appdomain. Verified by build --
+# m selinux_policy passes with these rules in.
+binder_use(hal_audio_default)
+allow hal_audio_default audioserver_service:service_manager find;
+# If a follow-up denial `hal_audio_default → audioserver:binder call` appears
+# under enforcing, base policy's binder_call(hal_audio_server, hal_audio_client)
+# should already cover it (audioserver is hal_audio_client); re-check before
+# adding anything here.

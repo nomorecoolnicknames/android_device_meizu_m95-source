@@ -1,0 +1,32 @@
+# mtkrild / mtkrildmd2 run in the base `rild` domain (labelled rild_exec in
+# file_contexts) so they inherit the stock radio privilege set. Device
+# extras: [CONV]
+allow rild ccci_device:chr_file rw_file_perms;
+allow rild sysfs_ccci:file r_file_perms;
+r_dir_file(rild, nvdata_file)
+allow rild nvdata_file:file rw_file_perms;
+get_prop(rild, mtk_md_prop)
+get_prop(rild, nvram_prop)
+allow rild pmsg_device:chr_file w_file_perms;
+
+# 2026-08-14 census: mtkrild reads the para/misc partition (modem boot flags,
+# META mode marker) — FACT: { read open } /dev/block/mmcblk0p2, labelled
+# misc_block_device by file_contexts. Read-only; writing boot control is not
+# rild's job.
+# R-SPLIT-DROP (domain.te:610 reserves misc for OTA; the userdebug escape
+# hatch is not honoured by the sepolicy_neverallows check, which asserts the
+# user variant): allow rild misc_block_device:blk_file r_file_perms;
+
+# NOT granted, deliberately: FACT { dac_override } self:capability (x2).
+# Which file rild was short DAC rights on has not been identified, and the
+# kernel.te mtk_wmtd analysis showed these probes can be spurious. Granting
+# dac_override to the radio daemon on a hunch is exactly the wrong trade.
+# FALSIFIER for whoever picks this up: under enforcing (or with auditallow),
+# correlate the next dac_override burst with the syscall via strace on rild;
+# if a real EACCES follows, fix the file's unix ownership instead.
+
+# 2026-08-21 census: the reader of net.handover.thlte predicted by property.te
+# exists after all — it is mtkrild itself. FACT: denied { read open getattr }
+# on /dev/__properties__/u:object_r:m95_handover_prop:s0, scontext=u:r:rild:s0
+# (permissive-complete boot, 2026-08-21). mtkmal sets it, rild reads it.
+get_prop(rild, m95_handover_prop)

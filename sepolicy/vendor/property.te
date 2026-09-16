@@ -1,0 +1,106 @@
+# Property types — Meizu MX6 (m95).
+# Deliberately small: only properties tied to domains this policy declares.
+# (The m681 template carries ~110 cm-14.1-era prop types, most unbound; that
+# pile is NOT copied. Add types here only together with a property_contexts
+# binding and a user.)
+
+# WMT combo-chip state (persist.mtk.wcn.*, service.wcn.*) — set by the wmt
+# loader chain, read by the wifi/bt stack. [CONV]
+type wmt_prop, property_type;
+
+# GPS daemon state. [CONV]
+type mnld_prop, property_type;
+
+# Modem state (ril.active.md, mtk.md*). [CONV]
+type mtk_md_prop, property_type;
+
+# ctl. ACL for the MTK radio service zoo (ctl.ccci*, ctl.ril-*, ctl.muxreport*,
+# ctl.*mdlogger*, ctl.gsm0710muxd*): one type instead of the m681 template's
+# 25 separate ctl_*_prop types — property_contexts prefixes cover the set. [CONV]
+type ctl_mtk_radio_prop, property_type;
+
+# nvram_daemon readiness flag (service.nvram_init). [CONV]
+type nvram_prop, property_type;
+
+# MTK log daemons (persist.mtklog.*, debug.mdlogger.*). [CONV]
+type mtklog_prop, property_type;
+
+# AKM compass driver control flags (nosecure.akm.*), set by the sensor HAL.
+# These land on default_prop otherwise, which no HAL may set. [CONV]
+type m95_sensor_prop, property_type;
+
+# PQ (picture-quality) tuning knobs: persist.sys.pq.* and debug.pq.*. Without a
+# type of their own they fall on system_prop/debug_prop, which the pq domain
+# may not set, and every boot loses the tuning and logs an error per knob. [CONV]
+type m95_pq_prop, property_type;
+
+# Wi-Fi 5G capability flag published by nvram_daemon (ro.wlan.mtk.*). [CONV]
+type m95_wlan_prop, property_type;
+
+# volte daemon control pairs, set by mtkmal. [FACT 2026-08-18 census #2:
+# denied { set } property=ctl.stop$volte_{stack,ua,imcb} from u:r:mtkmal:s0,
+# tcontext=ctl_stop_prop] Exact ctl.start$/ctl.stop$ entries beat the generic
+# prefixes (see the ril-daemon note below in property_contexts), so this
+# hands mtkmal control of the three VoLTE daemons only, not ctl_stop_prop
+# wholesale.
+type ctl_volte_prop, property_type;
+
+# MAL LTE-handover flag. [FACT 2026-08-18 census #2: denied { set }
+# property=net.handover.thlte tcontext=system_prop] Typed so a vendor daemon
+# does not get system_prop wholesale; "net.handover." is longer than plat's
+# "net." prefix, so this binding wins the lookup. No reader of the property
+# exists in our system image today; a reader would census a read denial.
+type m95_handover_prop, property_type;
+
+# Forge bring-up knobs: persist.forge.* (ims_single_transport, ims_modem_kick,
+# ims_pdn_holder, ims_auto_recover, ims_kick_ril, ims_reg_watch_idle_min,
+# volte_kicker). Read by ForgeImsService, which runs in the `radio` domain, and
+# by init (init.m95.volte.rc:68 triggers on persist.forge.volte_kicker=1).
+# Without a type of their own they land on default_prop, which AOSP grants no
+# domain a read on -- so the alternative is get_prop(radio, default_prop), a
+# grant on every unlabelled property on the device. [CONV]
+type m95_forge_prop, property_type;
+
+# init.svc.volte_{ua,stack,imcb,kicker}. init publishes the readiness of every
+# service under init.svc.<name>; only the vendor./odm. prefixed ones get
+# vendor_default_prop (private/property_contexts:188-189), the rest fall through
+# to default_prop. ForgeImsService polls init.svc.volte_imcb before kicking the
+# modem (A11_BRINGUP_STATE §2r, "звено 8"), so `radio` has to be able to read
+# these four names -- and only these four. [CONV]
+type m95_volte_svc_prop, property_type;
+
+# MTK vendor telephony/IMS knobs that a CORE process has to read.
+#
+# Повод -- разбор линии volte-review; состояние уточнено замером собранной
+# политики. private/property_contexts:195 метит `persist.vendor.` типом
+# vendor_default_prop. У private/domain.te две ветки: при
+# PRODUCT_COMPATIBLE_PROPERTY=true грант сужается до
+# get_prop({ domain -coredomain -appdomain }, vendor_default_prop), и домен
+# radio исключён поимённо (private/radio.te:1 делает его coredomain).
+#
+# **Сегодня на этом аппарате дыры НЕТ** (FACT, замер собранной политики):
+# в plat_sepolicy.cil стоит (allow domain vendor_default_prop (file (read
+# getattr map open))) -- активна ветка compatible_property_not_set, потому что
+# PRODUCT_COMPATIBLE_PROPERTY = false (`get_build_var`), потому что эффективный
+# PRODUCT_SHIPPING_API_LEVEL = 25: lineage_m95.mk:42 тянет
+# product_launched_with_n_mr1.mk ПОСЛЕ device.mk:65, где стоит 30.
+#
+# Тип заведён не «чтобы починить», а чтобы поломка не пришла молча при первой
+# же правке уровня API: 30 -- то, что дерево уже считает своим уровнем (комментарий
+# в device.mk:63-64, комментарий в manifest.xml:185), и в день, когда это станет
+# правдой, radio разом потеряет и default_prop, и vendor_default_prop.
+# com.mediatek.ims (домен radio) читает как минимум шесть таких свойств:
+# persist.vendor.ims_support, persist.vendor.mims_support,
+# persist.vendor.ims.simulate, persist.vendor.mtk.volte.enable,
+# persist.vendor.mtk.wfc.enable, persist.vendor.mtk_wfc_support.
+#
+# Два из них поведенческие, а не косметические: ImsCommonUtil.supportMdAutoSetupIms()
+# гейтит enableImsAdapter в initImsAvailability, supportMims() -- дискриминатор
+# транспорта. SystemProperties.get исключений не бросает, поэтому под enforcing
+# отказ вернул бы ДЕФОЛТ, и ветка выбралась бы случайно, без единой строки в
+# логе. Ровно класс `dontaudit-hides-real-failures`.
+#
+# Своим типом, а не get_prop(radio, vendor_default_prop): последнее отдало бы
+# radio каждое вендорное свойство на аппарате. Вендорные читатели ничего не
+# теряют -- ниже воспроизведён тот же самый набор, что им давала платформа. [CONV]
+type m95_ims_vendor_prop, property_type;

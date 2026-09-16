@@ -1,0 +1,114 @@
+# MTK CCCI modem daemons. Ported from the m681 template, TRIMMED to binaries
+# that actually exist in vendor/meizu/m95/proprietary/vendor/bin [DEV]
+# (dropped: ccci_rpcd, permission_check — not shipped for mt6797).
+# mtkrild/mtkrildmd2 are labelled rild_exec (base rild domain) instead of
+# getting custom domains — see file_contexts and rild.te.
+# None of these services are in our init.mt6797.rc yet; every rule is
+# MTK/m681 convention [CONV].
+
+type ccci_fsd, domain;
+type ccci_mdinit, domain;
+type emdlogger, domain;
+type flashlessd, domain;
+type gsm0710muxd, domain;
+type mdlogger, domain;
+type rilproxy, domain;
+type statusd, domain;
+type terservice, domain;
+type viarild, domain;
+
+init_daemon_domain(ccci_fsd)
+init_daemon_domain(ccci_mdinit)
+init_daemon_domain(emdlogger)
+init_daemon_domain(flashlessd)
+init_daemon_domain(gsm0710muxd)
+init_daemon_domain(mdlogger)
+init_daemon_domain(rilproxy)
+init_daemon_domain(statusd)
+init_daemon_domain(terservice)
+init_daemon_domain(viarild)
+
+# ccci_mdinit orchestrates modem bring-up: starts/stops the radio service zoo
+# via ctl. properties and flags modem state.
+set_prop(ccci_mdinit, mtk_md_prop)
+set_prop(ccci_mdinit, ctl_mtk_radio_prop)
+get_prop(ccci_mdinit, radio_prop)
+set_prop(statusd, mtk_md_prop)
+get_prop(ccci_fsd, mtk_md_prop)
+
+# Modem filesystem daemon: NV data + protected partitions + CCCI nodes.
+wakelock_use(ccci_fsd)
+r_dir_file(ccci_fsd, nvdata_file)
+allow ccci_fsd nvdata_file:file rw_file_perms;
+r_dir_file(ccci_fsd, protect_f_data_file)
+allow ccci_fsd protect_f_data_file:file rw_file_perms;
+r_dir_file(ccci_fsd, protect_s_data_file)
+allow ccci_fsd protect_s_data_file:file rw_file_perms;
+allow ccci_fsd ccci_device:chr_file rw_file_perms;
+allow ccci_fsd sysfs:file r_file_perms;
+allow ccci_fsd sysfs_ccci:file r_file_perms;
+
+r_dir_file(ccci_mdinit, nvdata_file)
+allow ccci_mdinit nvdata_file:file rw_file_perms;
+allow ccci_mdinit ccci_device:chr_file rw_file_perms;
+allow ccci_mdinit sysfs:file r_file_perms;
+allow ccci_mdinit sysfs_ccci:file rw_file_perms;
+# modem images are read from the raw md*img partitions on flashless setups
+allow ccci_mdinit mdimg_block_device:blk_file r_file_perms;
+allow ccci_mdinit block_device:dir search;
+
+# 27.010 mux daemons sit between rild and the CCCI tty.
+allow gsm0710muxd ccci_device:chr_file rw_file_perms;
+set_prop(gsm0710muxd, radio_prop)
+get_prop(gsm0710muxd, mtk_md_prop)
+# gsm0710muxd hands the RIL over once the MUX is up: property_set("ctl.stop",
+# "ril-daemon") then property_set("ctl.start","ril-daemon-mtk")
+# [FACT: strings -a vendor/bin/gsm0710muxd -> "ctl.stop", "ril-daemon",
+# "%d:%s(): ril-daemon stopped!", "ctl.start", "ril-daemon-mtk",
+# "%d:%s(): ril-daemon-mtk started!"; confirmed live 2026-08-09 —
+# init.svc.ril-daemon=stopped and ril.rilproxy=1 (a property only
+# vendor/lib64/mtk-ril.so ever sets) with muxd running].
+# property_contexts maps the "ctl.ril-" prefix to ctl_mtk_radio_prop, so
+# without this grant BOTH of those property_sets are denied and the RIL never
+# starts. It works today only because the device is running SELinux
+# Permissive [FACT: `getenforce` -> Permissive, 2026-08-09]; it breaks the
+# moment the port goes Enforcing.
+set_prop(gsm0710muxd, ctl_mtk_radio_prop)
+# NOTE: stock muxd creates pts-style nodes under /dev/radio; deliberately not
+# granted yet — needs a real denial to pick the right node label/perms.
+
+# rilproxy bridges the framework rild socket to mtkrild.
+allow radio rilproxy:unix_stream_socket connectto;
+allow radio rild_socket:sock_file write;
+allow rilproxy rild_socket:sock_file write;
+allow rilproxy init:unix_stream_socket connectto;
+allow rilproxy socket_device:sock_file write;
+allow rilproxy property_socket:sock_file write;
+
+# Loggers
+set_prop(emdlogger, mtklog_prop)
+set_prop(mdlogger, mtklog_prop)
+get_prop(emdlogger, mtklog_prop)
+allow emdlogger sysfs:file r_file_perms;
+allow emdlogger ccci_device:chr_file rw_file_perms;
+allow mdlogger ccci_device:chr_file rw_file_perms;
+
+##########################
+# 2026-08-14 census additions.
+
+# emdlogger walks the CCCI sysfs tree and — MTK library habit — re-reads
+# /plat_file_contexts (its libselinux clone loads contexts to restorecon its
+# own log dirs). FACT: { read open getattr } plat_file_contexts (emdlogger1/3),
+# { search } sysfs_ccci dir + { read } kcfg_setting. The contexts file is
+# world-readable data; granting read is noise-hygiene, not privilege.
+allow emdlogger file_contexts_file:file r_file_perms;
+r_dir_file(emdlogger, sysfs_ccci)
+
+# ccci_mdinit had file rw on sysfs_ccci but not the dir walk. FACT:
+# { search } name="ccci" (x2).
+allow ccci_mdinit sysfs_ccci:dir search;
+
+# gsm0710muxd drops from root to its service identity after opening the CCCI
+# tty. FACT: { setuid } self capability (x2). setgid not observed; add it
+# only if a denial names it.
+allow gsm0710muxd self:capability setuid;

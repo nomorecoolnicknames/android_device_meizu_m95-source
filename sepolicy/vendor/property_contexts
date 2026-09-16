@@ -1,0 +1,93 @@
+# property_contexts — Meizu MX6 (m95).
+# Prefix-matched unless marked exact. All bindings are MTK convention [CONV];
+# none are confirmed by an on-device denial yet.
+
+persist.mtk.wcn.        u:object_r:wmt_prop:s0
+service.wcn.            u:object_r:wmt_prop:s0
+
+mnld.                   u:object_r:mnld_prop:s0
+persist.mnld.           u:object_r:mnld_prop:s0
+
+ril.active.md           u:object_r:mtk_md_prop:s0
+mtk.md                  u:object_r:mtk_md_prop:s0
+
+service.nvram_init      u:object_r:nvram_prop:s0
+
+persist.mtklog.         u:object_r:mtklog_prop:s0
+debug.mdlogger.         u:object_r:mtklog_prop:s0
+
+# ctl. ACLs for MTK radio services (looked up as "ctl.<service>")
+ctl.ccci                u:object_r:ctl_mtk_radio_prop:s0
+ctl.ril-                u:object_r:ctl_mtk_radio_prop:s0
+ctl.gsm0710muxd         u:object_r:ctl_mtk_radio_prop:s0
+ctl.muxreport           u:object_r:ctl_mtk_radio_prop:s0
+ctl.mdlogger            u:object_r:ctl_mtk_radio_prop:s0
+ctl.emdlogger           u:object_r:ctl_mtk_radio_prop:s0
+ctl.dualmdlogger        u:object_r:ctl_mtk_radio_prop:s0
+ctl.viarild             u:object_r:ctl_mtk_radio_prop:s0
+
+# AKM compass control flags set by hal_sensors_default (nosecure.akm.resetdoe)
+nosecure.akm.           u:object_r:m95_sensor_prop:s0
+
+# PQ tuning knobs set by the pq daemon
+persist.sys.pq.        u:object_r:m95_pq_prop:s0
+debug.pq.              u:object_r:m95_pq_prop:s0
+
+# Wi-Fi capability flag published by nvram_daemon
+ro.wlan.mtk.           u:object_r:m95_wlan_prop:s0
+
+# gsm0710muxd restarts the RIL daemons by name. Exact entries beat the generic
+# ctl.start$/ctl.stop$ prefixes, so this grants control of these services only
+# rather than of every service on the device.
+ctl.start$ril-daemon-mtk   u:object_r:ctl_mtk_radio_prop:s0
+ctl.stop$ril-daemon-mtk    u:object_r:ctl_mtk_radio_prop:s0
+ctl.start$ril-daemon       u:object_r:ctl_mtk_radio_prop:s0
+ctl.stop$ril-daemon        u:object_r:ctl_mtk_radio_prop:s0
+
+# PQ colour-mode config the camera publishes once at first use. It is a ro.
+# property and was empty on a live device (getprop returned nothing, and no
+# mtk_pq property existed at all), so this is a real setting being lost, not a
+# redundant re-set.
+ro.mtk_pq              u:object_r:m95_pq_prop:s0
+
+# volte daemon control, set by mtkmal (property.te ctl_volte_prop)
+ctl.start$volte_ua      u:object_r:ctl_volte_prop:s0
+ctl.stop$volte_ua       u:object_r:ctl_volte_prop:s0
+ctl.start$volte_stack   u:object_r:ctl_volte_prop:s0
+ctl.stop$volte_stack    u:object_r:ctl_volte_prop:s0
+ctl.start$volte_imcb    u:object_r:ctl_volte_prop:s0
+ctl.stop$volte_imcb     u:object_r:ctl_volte_prop:s0
+
+# MAL LTE-handover flag set by mtkmal (net.handover.thlte observed)
+net.handover.           u:object_r:m95_handover_prop:s0
+
+# Forge bring-up knobs, read by ForgeImsService (domain radio) and by init.
+persist.forge.          u:object_r:m95_forge_prop:s0
+
+# Readiness of our four VoLTE services, polled by ForgeImsService. Prefix, not
+# exact: it covers volte_ua, volte_stack, volte_imcb and volte_kicker and
+# nothing else, and "init.svc.volte_" is longer than any plat prefix that
+# matches (private/property_contexts:114 is the bare catch-all), so it wins the
+# lookup.
+init.svc.volte_         u:object_r:m95_volte_svc_prop:s0
+
+# MTK vendor IMS/telephony knobs, читаются в том числе доменом radio
+# (com.mediatek.ims). Длиннее плат-префикса `persist.vendor.` (property.te).
+# Набор снят grep-ом по ВСЕМУ vendor-18.1/forge/ims (наша половина + донорская):
+# 64 различных persist.vendor.* свойства, все читаются Java-кодом внутри
+# com.mediatek.ims, то есть доменом radio. Нативных частей в этом дереве нет
+# (find по *.c/*.cpp/*.so пуст), поэтому вендорных читателей среди них не
+# скрывается. Первая редакция (2026-09-09, вечер) перечисляла восемь имён по
+# списку из одиннадцати и покрывала меньше трети — префиксы ниже покрывают всё.
+persist.vendor.mtk              u:object_r:m95_ims_vendor_prop:s0
+persist.vendor.ims              u:object_r:m95_ims_vendor_prop:s0
+persist.vendor.mims_support     u:object_r:m95_ims_vendor_prop:s0
+persist.vendor.vilte_support    u:object_r:m95_ims_vendor_prop:s0
+persist.vendor.viwifi_support   u:object_r:m95_ims_vendor_prop:s0
+persist.vendor.volte_support    u:object_r:m95_ims_vendor_prop:s0
+persist.vendor.vt.              u:object_r:m95_ims_vendor_prop:s0
+persist.vendor.operator.        u:object_r:m95_ims_vendor_prop:s0
+persist.vendor.radio.           u:object_r:m95_ims_vendor_prop:s0
+persist.vendor.ss.              u:object_r:m95_ims_vendor_prop:s0
+persist.vendor.suppserv.        u:object_r:m95_ims_vendor_prop:s0
+persist.vendor.log.             u:object_r:m95_ims_vendor_prop:s0

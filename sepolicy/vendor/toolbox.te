@@ -1,0 +1,94 @@
+# toolbox — the domain a toybox applet lands in when init execs it.
+#
+# AOSP's public/toolbox.te is eight rules long and its comment says the only
+# known usage is mkswap via fs_mgr. On this device it has a second user, and
+# that user is a thermal mitigation.
+#
+# WHO IS IN THIS DOMAIN HERE. rootdir/init.m95.cpuset.rc:20 starts
+#   service m95_cpuset /system/bin/sh /m95-cpuset.sh
+# with no `seclabel`, so the shell itself stays in init's domain; the `cat`
+# processes it forks are toybox, hit toolbox_exec, and domain_auto_trans into
+# toolbox. Both denials below are those `cat`s.
+#
+# WHAT THE SCRIPT DOES (rootdir/m95-cpuset.sh, and its header carries the
+# measurements): this kernel has no cpuset_v2_mode, so cgroup v1 drops a cpu
+# from cpus_allowed when hotplug parks it and never restores it. /dev/cpuset/cpus
+# decays monotonically until every cpuset on this deca-core holds a single A53 -
+# measured: online was 0-2,4-9 while the root cpuset was down to a bare 4, load
+# average 20, and the phone ran HOTTER because the same work took far longer.
+# The script re-reads the online mask every 5 s and rewrites the root set and
+# its children.
+
+##########################
+# FACT (live device, 2026-08-10):
+#   avc: denied { read } for comm="cat" name="cpus" dev="cgroup" ino=8
+#        scontext=u:r:toolbox:s0 tcontext=u:object_r:cgroup:s0
+#        tclass=file  permissive=1                                       (x3)
+#
+# FACT: `ls -lZ /dev/cpuset/cpus` -> u:object_r:cgroup:s0, and /proc/mounts
+# shows /dev/cpuset is a cgroup mount (cpuset,noprefix,release_agent=...).
+#
+# Read, specifically. system/sepolicy/public/domain.te:245-246 already gives
+# EVERY domain cgroup:dir { search write } and cgroup:file w_file_perms, and
+# w_file_perms is { open append write lock map } - which is why the audit shows
+# only { read } and not { open }: the open was already allowed and the read was
+# not. The platform hands out write on these files freely and withholds read.
+#
+# WHAT BREAKS WITHOUT IT, under enforcing: `root_cpus=$(cat /dev/cpuset/cpus)`
+# comes back empty, `[ -n "$root_cpus" ] || return 0` bails, and sync_once does
+# nothing. The 5 s loop keeps spinning, exits nothing, logs nothing and stops
+# mitigating - so the cpusets collapse back to one core exactly as measured
+# above, with no denial left in the log to say why. This is the loudest example
+# on the device of a mitigation that keeps running after it stops working.
+#
+# Narrow by DOMAIN rather than by type, deliberately. A tighter target type is
+# not reachable: cgroup labels come from `genfscon cgroup /`, and every cgroup
+# hierarchy on this device (/acct, /dev/cpuctl, /dev/cpuset) is the same
+# filesystem TYPE, so a genfscon path prefix cannot distinguish the cpuset mount
+# from the others. toolbox is the smallest domain in the policy and only init
+# may enter it (`neverallow { domain -init } toolbox:process transition`), so
+# read on cgroup files here is a much smaller grant than the write the platform
+# already gives all 300-odd domains.
+#
+# `getattr` is included on inference, not observation: only { read } was audited,
+# but getattr is the standard companion of a read on a proc/sysfs-like file and
+# a second denial on it would reproduce the same silent failure. Nothing else
+# is granted - note in particular that public/domain.te:1407 neverallows
+# cgroup:file create for every domain, so this must stay a read.
+allow toolbox cgroup:file { read getattr };
+
+##########################
+# FACT (live device, 2026-08-10):
+#   avc: denied { write } for comm="cat" path="pipe:[N]"
+#        scontext=u:r:toolbox:s0 tcontext=u:r:init:s0
+#        tclass=fifo_file  permissive=1                                  (x3)
+#
+# The other half of the same defect, and the half that breaks BOTH reads in the
+# script rather than one. `online=$(cat ...)` and `root_cpus=$(cat ...)` are
+# command substitutions: the shell (init domain) creates the pipe, so the pipe
+# inode carries init's label, and the `cat` (toolbox domain) writing into it is
+# a cross-domain fifo_file write. public/domain.te:28 grants
+# `allow domain self:{ fifo_file file } rw_file_perms` - self only, which does
+# not cover an inherited pipe created by a different domain.
+#
+# WHAT BREAKS WITHOUT IT, under enforcing: both command substitutions return
+# empty. `[ -n "$online" ]` is false so the root cpuset is never rewritten, and
+# `[ -n "$root_cpus" ]` is false so the children are never rewritten either.
+# Note the failure is asymmetric and that is what makes it silent: the
+# `echo "$root_cpus" > /dev/cpuset/.../cpus` redirects are shell BUILTINS
+# running in the init domain and would still succeed - the script would keep
+# writing, it would just have nothing to write.
+#
+# Scoped to init because init is the only domain that may exec into toolbox, so
+# it is the only domain whose pipes a toolbox process can ever inherit. `write`
+# only - not read, not getattr, not ioctl; a writer end of a substitution pipe
+# needs nothing else.
+#
+# FOLLOW-UP worth taking, which would delete both rules above: rewrite the two
+# command substitutions in m95-cpuset.sh as mksh input redirections
+# (`read online < /sys/devices/system/cpu/online`). That keeps the read in the
+# shell, so no toolbox process and no pipe is created at all. It was not done
+# here because it moves the cgroup read into the INIT domain, and this tree's
+# init.te opens with an explicit instruction not to add power to init - a rule
+# on the eight-line toolbox domain is the cheaper of the two.
+allow toolbox init:fifo_file write;

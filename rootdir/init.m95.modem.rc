@@ -1,0 +1,341 @@
+# init.m95.modem.rc — Meizu MX6 (m95), MT6797 modem bring-up:
+# md1 (GSM/WCDMA/LTE) + md3 (C2K/CDMA).
+#
+# The MX6 is full-netcom: ro.mtk_c2k_support=1, ro.mtk_enable_md3=1,
+# ril.external.md=0, mtk.eccci.c2k=enabled [DEV: stock Flyme 8.0.5.0A
+# system build.prop], and the md1img/md1dsp/md1arm7/md3img partitions exist
+# on device [DEV: sepolicy file_contexts, scatter]. C2K runs over the
+# integrated CCCI (eccci), not the legacy VIA SDIO path.
+#
+# SERVICE NAMES ARE LOAD-BEARING — the daemons chain-start each other via
+# hardcoded ctl.start property values [FACT: strings on the m95 blobs]:
+#   ccci_mdinit  -> "ccci_fsd", "gsm0710muxd", "gsm0710muxdmd2"
+#   gsm0710muxd  -> "ril-daemon-mtk"
+#   rc trigger   -> "ril-proxy" on ril.rilproxy=1 [DEV: stock init.rilproxy.rc:51]
+# Do not rename services in this file.
+#
+# Socket layout follows stock's EFFECTIVE config: stock defines ril-daemon-mtk
+# TWICE (init.modem.rc:67 with rild* sockets; init.rilproxy.rc:26 with mrild*
+# sockets). init.rilproxy.rc is imported first (stock init.mt6797.rc:8 vs :20),
+# so init rejected the init.modem.rc duplicate and the C2K/rilproxy layout —
+# ril-proxy owns sockets rild..rild4, mtkrild owns mrild* — is what actually
+# ran on this device. librilproxy.so contains rild/rild2/rild3/rild4 and
+# librilmtk.so contains mrild/mrild2 [FACT: strings], consistent with that.
+#
+# RESOLVED 2026-08-09 (this comment previously called the framework<->RIL
+# bridge an unsolved work item; that is no longer true). Pie telephony works
+# through the HIDL path and the socket path is vestigial. Measured on the
+# booted device [FACT, HANDOFF_NEXT_REVIEW.md §4.1]:
+#   lshal          -> android.hardware.radio@1.0::IRadio/slot1 and /slot2
+#                     registered by rild, with system_server as their client
+#   gsm0710muxd    -> "Frames received/dropped: 430/0"
+#   rild           -> "AT> AT+EFUN=1" / "AT< OK", "AT> AT+CPIN?"
+#   /proc/net/unix -> every rild*/mrild* socket is state 01, no peer connected
+# So RILJ never opens a unix socket here: it speaks IRadio to ril-daemon-mtk.
+
+on post-fs-data
+    # gsm0710muxd symlinks its pty slaves to /dev/radio/ptty* and mtk-ril
+    # connects there; nobody else creates the directory. [DEV: stock
+    # init.mt6797.rc:154 ("create for muxd pts device node"), same
+    # post-fs-data trigger]
+    mkdir /dev/radio 0770 radio radio
+
+    # Modem NV + config dirs [DEV: stock init.modem.rc:21-43]
+    mkdir /data/nvram/md 0770 root system
+    mkdir /data/nvram/md3 0770 root system
+    mkdir /data/md3 0770 root system
+    mkdir /data/ccci_cfg 0770 system radio
+    restorecon_recursive /data/ccci_cfg
+    chown radio radio /sys/kernel/ccci/boot
+
+##############################
+# CCCI modem filesystem servers + modem-image loaders.
+# Not disabled: auto-start with class core, as stock. ccci_mdinit also
+# re-ctl.starts ccci_fsd on modem restart [FACT: strings].
+##############################
+
+# md1 [DEV: stock init.modem.rc:141-151]
+service ccci_fsd /vendor/bin/ccci_fsd 0
+    class core
+    user radio
+    group radio system
+    oneshot
+
+service ccci_mdinit /vendor/bin/ccci_mdinit 0
+    class core
+    user system
+    group radio system
+    oneshot
+
+# md3 / C2K [DEV: stock init.modem.rc:153-163; md3img partition + eccci C2K
+# props verified — see header]
+service ccci3_fsd /vendor/bin/ccci_fsd 2
+    class core
+    user radio
+    group radio system
+    oneshot
+
+service ccci3_mdinit /vendor/bin/ccci_mdinit 2
+    class core
+    user system
+    group radio system
+    oneshot
+
+##############################
+# 07.10 MUX daemons — started by ccci_mdinit via ctl.start [FACT: strings].
+##############################
+
+# [DEV: stock init.modem.rc:46-51]
+service gsm0710muxd /vendor/bin/gsm0710muxd -s /dev/ttyC0 -f 512 -n 8 -m basic
+    class core
+    user root
+    group radio cache inet misc
+    disabled
+    oneshot
+
+# md2 does not exist on MT6797 (md1+md3 SoC), but ccci_mdinit carries a
+# ctl.start reference to this name [FACT: strings]; kept disabled so a stray
+# ctl.start hits a defined-but-disabled service instead of an init error.
+# [DEV: stock init.modem.rc:53-58]
+service gsm0710muxdmd2 /vendor/bin/gsm0710muxdmd2 -s /dev/ccci2_tty0 -f 512 -n 8 -m basic
+    class core
+    user root
+    group radio cache inet misc
+    disabled
+    oneshot
+
+##############################
+# RIL daemons. mtkrild/mtkrildmd2 exec labels are rild_exec -> base rild
+# domain (sepolicy decision, sepolicy/README.md).
+##############################
+
+# Started by gsm0710muxd via ctl.start once MUX channels are up. Disassembly
+# of gsm0710muxd (FUN_000139a0, args resolved from the literal pools) proves
+# the exact sequence on mux success: property_set("ctl.stop","ril-daemon")
+# then property_set("ctl.start","ril-daemon-mtk"), then setuid(radio).
+# "ril-daemon" is the AOSP Pie rild from rild.legacy.rc (class main) — the
+# instance that on the 2026-08-07 boot loaded mtk-ril.so via rild.libpath and
+# registered IRadio 1.1 [FACT: m95-logcat-1821.txt:6-13 +
+# init.svc.ril-daemon=running live]. It is the ONLY Pie-framework-compatible
+# RIL: the Nougat mtkrild registers unix sockets, no HIDL.
+#
+# So this service must be the AOSP rild binary, not mtkrild: muxd kills the
+# HIDL rild and starts THIS name; pointing it at mtkrild would trade the
+# working HIDL registration for a socket RIL Pie cannot talk to. Running
+# rild here also fixes ordering: it now starts only after /dev/radio/ptty*
+# exist instead of retrying every 10 s. rild reads rild.libpath/rild.libargs
+# from system.prop, same as the legacy instance did. (Previous exec:
+# /vendor/bin/mtkrild — stock's Nougat layout, init.rilproxy.rc:26-48; the
+# mrild* socket set is kept, mtk-ril.so grabs its control sockets from the
+# environment.)
+service ril-daemon-mtk /vendor/bin/hw/rild
+    class core
+    socket mrild stream 660 root radio
+    socket mrild2 stream 660 root radio
+    socket mrild3 stream 660 root radio
+    socket mrild4 stream 660 root radio
+    # No explicit seclabel here on purpose. Naming the label makes init
+    # create the socket OBJECT with that type, which it may not do:
+    #   avc: denied { create } scontext=u:r:init tcontext=rild_ims_socket
+    #        tclass=unix_stream_socket
+    # and the socket then does not exist at all. Declaring the socket here
+    # is enough by itself: init creates the node and file_contexts labels
+    # it, which is exactly how the neighbouring rild-oem gets its own type.
+    # The label was missing before only because rild bound the socket
+    # itself, with no declaration for init to act on.
+    socket rild-ims stream 660 root radio
+    socket rild-debug stream 660 radio system
+    socket rild-oem stream 660 radio system
+    socket rild-mtk-ut stream 660 radio net_bt
+    socket rild-mtk-ut-2 stream 660 radio net_bt
+    socket rild-mtk-modem stream 660 radio system
+    socket rild-atci stream 660 root radio
+    socket rild-mal stream 660 radio system
+    socket rild-mal-at stream 660 radio system
+    socket rild-vsim stream 660 root radio
+    socket rild-mbim stream 660 root radio
+    socket msap_uim_socket1 stream 660 radio radio
+    socket msap_uim_socket2 stream 660 radio radio
+    user root
+    group radio cache inet misc audio sdcard_r sdcard_rw log system
+    disabled
+    # NO `oneshot` — deliberate divergence from stock (stock/m681-template
+    # init.rilproxy.rc:52 marks mtkrild oneshot).
+    #
+    # Stock can afford oneshot because MTK's only expected rild death is a
+    # modem exception, and ccci_mdinit re-issues ctl.start after it restarts
+    # the MD [FACT: strings -a vendor/bin/ccci_mdinit -> "ctl.stop",
+    # "ctl.start", "ril-daemon-mtk", "check_to_restart_md kill ril-proxy"].
+    # Our rild dies for a *software* reason instead (see BLOB_SHIMS /
+    # HANDOFF: mtk-ril.so calls s_rilenv->[+32] and ->[+40], which are past
+    # the end of AOSP Pie's 32-byte struct RIL_Env, so it does `blr 0`
+    # [FACT: tombstone_09 pc=0 at onUsimDetected+720; disassembly of
+    # vendor/lib64/mtk-ril.so 0x92d34-0x92d38]). No MD exception happens, so
+    # ccci_mdinit never restarts it.
+    #
+    # With `oneshot`, init's Reap() sets SVC_DISABLED and never restarts:
+    # observed live 2026-08-09 after 12 h uptime — init.svc.ril-daemon-mtk
+    # =stopped, no /dev/socket/mrild* (Reap unlinks them via
+    # SocketInfo::Clean, system/core/init/descriptors.cpp:78), no IRadio in
+    # lshal, 433 "RILJ: RadioProxy getService ... NoSuchElementException".
+    # Telephony was unrecoverable for the whole session.
+    #
+    # AOSP's own rild.rc has no oneshot, and the copy of the SAME binary that
+    # actually ships in /vendor/etc/init/rild.legacy.rc on this device is
+    # `class main` with no oneshot either. Match that: a rild crash must be
+    # survivable. NOTE: until the RIL_Env fix lands this turns one fatal
+    # crash into a ~5 s restart loop — that is intentional and louder, not
+    # quieter.
+
+# [DEV: stock init.modem.rc:91-108] md2 RIL — same "defined but disabled"
+# rationale as gsm0710muxdmd2. (Stock declares socket rild-vsim-md2 twice;
+# deduplicated here.)
+service ril-daemon-mtkmd2 /vendor/bin/mtkrildmd2
+    class core
+    socket rild-md2 stream 660 root radio
+    socket rild2-md2 stream 660 root radio
+    socket rild-debug-md2 stream 660 radio system
+    socket rild-oem-md2 stream 660 radio system
+    socket rild-mtk-ut-md2 stream 660 radio net_bt
+    socket rild-mtk-ut-2-md2 stream 660 radio net_bt
+    socket rild-mtk-modem-md2 stream 660 radio system
+    socket rild-atci-md2 stream 660 root radio
+    socket rild-vsim-md2 stream 660 root radio
+    socket rild-mal-md2 stream 660 radio system
+    socket rild-mbim-md2 stream 660 root radio
+    user root
+    group radio cache inet misc audio sdcard_r sdcard_rw log system
+    disabled
+    oneshot
+
+# GSM<->C2K request router; owns the sockets the (Nougat) framework used.
+# [DEV: stock init.rilproxy.rc:8-24, started via init.rilproxy.rc:50-51]
+service ril-proxy /vendor/bin/rilproxy -l mtk-rilproxy.so
+    class core
+    socket rild stream 660 root radio
+    socket rild2 stream 660 root radio
+    socket rild3 stream 660 root radio
+    socket rild4 stream 660 root radio
+    socket rilproxy-atci stream 660 root radio
+    socket rilproxy-mal stream 660 radio system
+    socket sap_uim_socket1 stream 660 bluetooth bluetooth
+    socket sap_uim_socket2 stream 660 bluetooth bluetooth
+    socket sap_uim_socket3 stream 660 bluetooth bluetooth
+    socket sap_uim_socket4 stream 660 bluetooth bluetooth
+    socket embmsd stream 660 radio inet
+    user root
+    group radio cache inet misc audio sdcard_r sdcard_rw log system
+    disabled
+    oneshot
+
+# NOT STARTED — deliberately. Stock's ril-proxy bridges the framework's unix
+# sockets to mtkrild; our layout runs neither side of that bridge, so the
+# daemon spends its whole life failing to connect to a peer that does not
+# exist. Measured 2026-08-09 [FACT, HANDOFF_NEXT_REVIEW.md §4.4]:
+#   logcat -b radio -> "connectSocket fail, try again -1" once a second,
+#                      forever — ~3600 wasted log lines an hour
+#   ps -A           -> only gsm0710muxd, rild and rilproxy exist; no mtkrild
+#   /proc/net/unix  -> mrild/mrild2 have flags 00000000, i.e. never listened
+#                      on, because mtkrild never ran to listen on them
+#   /proc/net/unix  -> nothing is connected to rild/rild2/rild3/rild4 or
+#                      sap_uim_socket*, the sockets ril-proxy itself owns
+# Keeping the service *defined* (above) costs nothing and documents stock's
+# layout; starting it only produces noise. The sockets it declares vanish
+# with it, which is safe precisely because no peer ever connected to them.
+#
+# Re-enable this trigger if mtkrild is ever brought up, or if BT SIM Access
+# Profile is needed — SAP is what sap_uim_socket* are for.
+#
+# on property:ril.rilproxy=1
+#     start ril-proxy
+
+# C2K RIL. With eccci C2K (ril.external.md=0) the SDIO tty argument is
+# vestigial, but the cmdline is kept verbatim from stock. Library verified
+# present: proprietary/vendor/lib/libviatelecom-withuim-ril.so [DEV: stock
+# init.modem.rc:116-129].
+service viarild /vendor/bin/viarild -l /vendor/lib/libviatelecom-withuim-ril.so -- -d /dev/ttySDIO4
+    class core
+    socket rild-via stream 660 radio radio
+    socket msap_c2k_socket1 stream 660 radio radio
+    socket msap_c2k_socket2 stream 660 radio radio
+    socket msap_c2k_socket3 stream 660 radio radio
+    socket msap_c2k_socket4 stream 660 radio radio
+    socket rpc stream 660 radio system
+    socket rild-ctclient stream 660 radio system
+    socket rild-atci-c2k stream 660 radio system
+    group radio cache inet misc audio sdcard_r sdcard_rw log system
+    disabled
+    oneshot
+
+# NOTE: stock viarild also declares "socket rild-debug", colliding with
+# ril-daemon-mtk's rild-debug (sockets are created at service start, so the
+# later-started service would steal the node). Dropped here; the C2K debug
+# path goes through rild-atci-c2k.
+
+# Telephony Early Read — reads SIM/modem info early in boot.
+# [DEV: stock init.modem.rc:192-196]
+service terservice /vendor/bin/terservice
+    class core
+    user radio
+    group radio cache inet misc
+    oneshot
+
+##############################
+# AOSP rild neutralised.
+##############################
+
+# full_base_telephony.mk pulls in AOSP rild; its rc
+# (hardware/ril/rild/rild.rc, parsed from /system/etc/init AFTER this
+# ramdisk file, so THIS definition wins and the later duplicate is rejected)
+# would run /vendor/bin/hw/rild as class main. With rild.libpath pointed at
+# the Nougat mtk-ril.so that is a guaranteed crash-loop, and the socket RIL
+# it served no longer exists in Pie. Defined here first and disabled.
+# [FACT: telephony.mk:27 adds rild; rild.rc content verified in the Pie tree]
+service vendor.ril-daemon /vendor/bin/hw/rild
+    class main
+    user radio
+    group radio cache inet misc audio log readproc wakelock
+    disabled
+    oneshot
+
+##############################
+# Modem loggers — all disabled; start manually (adb: start emdlogger1) when
+# debugging radio bring-up. Domains mdlogger/emdlogger prepared in sepolicy.
+##############################
+
+# [DEV: stock init.mt6797.rc:1187-1227; emdlogger6 exists in stock rc but the
+# binary is absent from our blob tree, so it is not defined]
+service mdlogger /vendor/bin/mdlogger
+    class main
+    user shell
+    group shell system radio sdcard_rw inet sdcard_r media_rw
+    disabled
+    oneshot
+
+service emdlogger1 /vendor/bin/emdlogger1
+    class main
+    user shell
+    group system shell radio sdcard_rw inet sdcard_r media_rw
+    disabled
+    oneshot
+
+service emdlogger2 /vendor/bin/emdlogger2
+    class main
+    user shell
+    group system shell radio sdcard_rw inet sdcard_r media_rw
+    disabled
+    oneshot
+
+service emdlogger3 /vendor/bin/emdlogger3
+    class main
+    user shell
+    group system shell radio sdcard_rw inet sdcard_r media_rw
+    disabled
+    oneshot
+
+service emdlogger5 /vendor/bin/emdlogger5
+    class main
+    user shell
+    group system shell radio sdcard_rw inet sdcard_r media_rw
+    disabled
+    oneshot

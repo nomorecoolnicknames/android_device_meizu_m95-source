@@ -1,0 +1,59 @@
+//
+// Copyright (C) 2017 The Android Open Source Project
+// Copyright (C) 2017,2020 The LineageOS Project
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+// Device-local fork of hardware/lineage/interfaces/biometrics/fingerprint/2.0.
+//
+// Why a fork rather than a patch on the shared tree: the two m95 fixes below
+// are device facts about ONE blob (a 272-byte device structure and a null
+// enumerate slot), the shared module is also compiled for other Meizu ports in
+// this tree, and a patch there lives outside our git and dies on the next repo
+// sync. Keeping it under device-18.1/ means RESYNC.sh owns it.
+//
+// Differences from upstream, both carried over from LOS 16.0 where they were
+// proven on hardware (FINGERPRINT_LANE.md):
+//   1. BiometricsFingerprint.h declares meizu_fingerprint_device_t — the real
+//      272-byte layout with the four Goodix vendor methods — so authenticate,
+//      cancel, remove, set_active_group and get_authenticator_id land on the
+//      functions they name. Compiled against <hardware/fingerprint.h> this
+//      wrapper called cancel whenever it meant authenticate.
+//   2. service.cpp starts a FRAMEWORK binder threadpool; the daemon's results
+//      arrive on /dev/binder and nothing was reading them.
+//   3. enumerate() no longer calls through the null slot.
+//
+// The module name carries a .m95 suffix only to avoid colliding with the
+// upstream module in the same build; the service name (vendor.fps_hal) and the
+// HIDL instance (default) are unchanged.
+cc_binary {
+    name: "android.hardware.biometrics.fingerprint@2.0-service.m95",
+    defaults: ["hidl_defaults"],
+    relative_install_path: "hw",
+    init_rc: ["android.hardware.biometrics.fingerprint@2.0-service.m95.rc"],
+    srcs: [
+        "service.cpp",
+        "BiometricsFingerprint.cpp",
+    ],
+    shared_libs: [
+        "libutils",
+        "liblog",
+        "libhidlbase",
+        "libhardware",
+        // Framework binder: the Goodix module and its daemon talk over
+        // /dev/binder, and this process has to serve that node itself.
+        "libbinder",
+        "android.hardware.biometrics.fingerprint@2.1",
+    ],
+    proprietary: true,
+}

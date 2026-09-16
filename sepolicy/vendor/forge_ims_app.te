@@ -1,0 +1,114 @@
+# ForgeImsService (com.mediatek.ims) — the ported Android 9 IMS app.
+#
+# DOMAIN: the app runs in `radio`, not a dedicated domain. It is uid radio
+# (sharedUserId android.uid.phone) and platform-signed, so plat_seapp_contexts
+# (`user=radio seinfo=platform domain=radio`) places it there. The 2026-08-24
+# permissive-window census (opened+closed by the lead, 18:38:12->18:38:41)
+# showed EXACTLY TWO denials for the whole app, both in `radio` — everything
+# else it needs (binder, telephony, network, the ImsResolver bind) `radio`
+# already grants. A dedicated forge_ims_app domain would have to re-derive that
+# entire surface from a fresh census (dozens of rules); `radio` + the two IMS
+# client edges below is the minimal-RULE choice. Cost: com.android.phone (also
+# `radio`) gains write on these two IMS sockets — narrow, and both are telephony.
+#
+# These are the same two client edges the native volte_kicker needed
+# (sepolicy/volte_kicker.te); here they belong to `radio` because that is where
+# the APK lands. Each connect(2) is two LSM checks — write on the peer's
+# sock_file inode, and connectto on the listener — so the connectto half is
+# granted alongside the observed write, not guessed (see the same reasoning in
+# sepolicy/init.te's rild-oem block).
+#
+# Census (verbatim), both scontext=u:r:radio:
+#   denied { write } comm="ForgeRildImsCon" name="rild-ims" tcontext=socket_device
+#   denied { write } comm="om.mediatek.ims" name="volte_imsm" tcontext=mtkmal_socket
+# The rild-ims node showed socket_device instead of rild_ims_socket even though
+# file_contexts labels it: rild's own sockets (class core, early) miss the
+# vendor_file_contexts labeling that mal-daemon's volte_imsm (late start) gets.
+# Fixed deterministically by an explicit seclabel on the socket line in
+# init.m95.modem.rc, so the grant below can be the NARROW rild_ims_socket type
+# rather than a blanket socket_device:sock_file write.
+
+# Client of /dev/socket/rild-ims (transport cycle 2: SET_IMS_ENABLE etc.).
+allow radio rild_ims_socket:sock_file write;
+allow radio rild:unix_stream_socket connectto;
+
+# Client of /dev/socket/volte_imsm (mtkmal): VaEvent 900003 that starts the
+# volte_* daemons. Node already carries mtkmal_socket (census confirmed).
+allow radio mtkmal_socket:sock_file write;
+allow radio mtkmal:unix_stream_socket connectto;
+
+# 2026-08-27: the modem kick. Our 2073 SET_IMS_ENABLE reaches the vendor's IMS
+# socket layer but never becomes an AT command (no "AT> AT+EIMS" follows it on
+# any boot), while the same command written to /dev/radio/atci1 does drive the
+# modem's IMC handshake -- which is what ends in a registered IMS (measured
+# live 2026-08-27: +EIMS:1 -> ims_reg_ind -> PDN_ACT_IND -> 900008 -> P-CSCF ->
+# REGISTER -> 200 OK). The node is a symlink into /dev/pts (devpts), mode 660
+# root:radio, so DAC already permits the app (uid radio); only the label stood
+# in the way.
+allow radio device:dir search;
+allow radio devpts:chr_file rw_file_perms;
+
+# 2026-09-09: the kick has to know whether volte_imcb is there to answer it.
+# The modem runs its IMC handshake against the daemon over /dev/ccci_imsc, not
+# against the AT channel, so AT+EIMS=1 sent while the daemon is absent burns the
+# modem's ~12 s window for nothing (b26: AT+EIMS=1 18:11:03.593 -> +EIMCFLAG: 0
+# 18:11:16, daemons up 18:11:24). ImsService now polls init.svc.volte_imcb
+# before kicking. init.svc.* carries no vendor./odm. prefix here, so it falls
+# through to the catch-all in private/property_contexts:114 -- default_prop --
+# and AOSP grants radio no read on it. Harmless today (the device is permissive)
+# and required the moment it is not.
+get_prop(radio, default_prop)
+
+# 2026-09-09, enforcing lane: the two typed reads that make the blanket
+# default_prop grant above unnecessary. Kept side by side on purpose -- the
+# blanket rule is what is running on the device today, the typed pair is what
+# should replace it, and dropping the blanket one is a change to verify on a
+# boot (SELINUX_ENFORCING_PLAN.md, step E3), not a paper edit.
+#   persist.forge.*   -> m95_forge_prop      (the knobs ImsService reads)
+#   init.svc.volte_*  -> m95_volte_svc_prop  (daemon readiness it polls)
+get_prop(radio, m95_forge_prop)
+get_prop(radio, m95_volte_svc_prop)
+
+# Поправка того же дня (повод -- разбор линии volte-review, вывод уточнён
+# замером собранной политики, а не чтением исходника).
+#
+# Комментарий над бланкетным правилом утверждает, что AOSP не даёт radio читать
+# default_prop -- это НЕ ТАК. default_prop несёт атрибут core_property_type
+# (public/property.te:316), и в СОБРАННОЙ политике этого аппарата стоит
+#   (allow domain core_property_type (file (read getattr map open)))
+# (out/.../system/etc/selinux/plat_sepolicy.cil) -- то есть грант выдан ВСЕМ
+# доменам. Бланкетное правило избыточно.
+#
+# Почему именно всем, а не {coredomain appdomain shell}: у private/domain.te
+# две ветки, и здесь активна compatible_property_not_set (строка 75), потому что
+# PRODUCT_COMPATIBLE_PROPERTY = false. FACT (`get_build_var`): эффективный
+# PRODUCT_SHIPPING_API_LEVEL на этой сборке = **25**, а не 30. В device.mk:65
+# стоит 30, но lineage_m95.mk:42 инherit-ит product_launched_with_n_mr1.mk,
+# который ставит 25, и делает это ПОСЛЕ device.mk. Смотреть на device.mk и
+# делать вывод про ветку -- ошибка, которую здесь уже совершили дважды.
+#
+# А два get_prop выше -- не «замена» бланкетному правилу, а то, что делает явное
+# правило ОБЯЗАТЕЛЬНЫМ: типизация выводит persist.forge.* и init.svc.volte_* ИЗ
+# core_property_type, и платформенный грант на них больше не распространяется.
+# Побочно это делает аппарат нечувствительным к тому, что ветка когда-нибудь
+# переключится: если shipping API поправят на 30, платформа сузит грант до
+# {coredomain appdomain shell}, а наши свойства к тому времени уже названы явно.
+#
+# Побочная выгода типизации, ради которой она в том числе и делалась: свои
+# ctl-права. Установить свойство с core-типом нельзя никому, кроме init
+# (public/domain.te:527 -- neverallow на default_prop:property_service set), а
+# persist.forge.* -- это ручки bring-up, которые крутят через adb. Со своим
+# типом это выражается явно и только на отладочной сборке.
+userdebug_or_eng(`
+  set_prop(shell, m95_forge_prop)
+  get_prop(shell, m95_forge_prop)
+')
+
+# MTK-вендорные ручки IMS. Разбор и оговорка про «сегодня не сломано» -- в
+# property.te над объявлением типа.
+get_prop(radio, m95_ims_vendor_prop)
+
+# И то же, что этим свойствам давала платформа через vendor_default_prop, --
+# чтобы переразметка ничего не отняла у вендорных читателей (mtkmal, rild,
+# volte_*). Дословная копия private/domain.te:105 для нашего типа.
+get_prop({ domain -coredomain -appdomain }, m95_ims_vendor_prop)

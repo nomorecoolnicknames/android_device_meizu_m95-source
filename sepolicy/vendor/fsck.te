@@ -1,0 +1,23 @@
+# fsck device extras — Meizu MX6 (m95).
+#
+# fstab.mt6797 marks the MTK protect partitions for check; e2fsck runs on
+# both at every boot. FACT (2026-08-14 census, first seconds of boot):
+#   avc: denied { read open write ioctl(0x127c) } /dev/block/mmcblk0p11
+#        tcontext=u:object_r:protect_f_device:s0  (comm e2fsck)
+#   ... and the identical set on mmcblk0p12 / protect_s_device.
+# Base policy gives fsck only getattr on dev_type. Under enforcing both
+# checks fail and mount proceeds on an unchecked partition — the exact
+# corruption class memory says this eMMC likes. rw_file_perms includes the
+# ioctl; no allowxperm is written (kernel xperm defect, ioctl_xperms.te),
+# and the platform ships no xperm filter for these pairs so the ioctl is
+# unrestricted once granted. 0x127c is BLKDISCARDZEROES, e2fsck's discard
+# probe.
+allow fsck protect_f_device:blk_file rw_file_perms;
+allow fsck protect_s_device:blk_file rw_file_perms;
+
+# e2fsck also touches the battery sysfs dir once at startup. FACT:
+# { search } power_supply, tcontext sysfs_batteryinfo (x1, comm e2fsck).
+# WHY it looks is not established (no attribute read inside was denied);
+# search alone is granted so the probe fails soft instead of noisy, and
+# nothing more until a denial names a file.
+allow fsck sysfs_batteryinfo:dir search;

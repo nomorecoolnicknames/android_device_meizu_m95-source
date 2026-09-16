@@ -1,0 +1,411 @@
+# file_contexts — Meizu MX6 (m95), MT6797, LineageOS 16.0.
+#
+# Evidence discipline:
+#   [DEV]  = node/path verified on THIS device (DEVICE_FACTS.md, live ueventd
+#            rules in rootdir/ueventd.mt6797.rc, kernel source kernel/m685, or
+#            blob strings in vendor/meizu/m95).
+#   [CONV] = MTK/m681-template convention carried over on faith; the node or
+#            path has not been observed on m95 yet. Confirm/remove with real
+#            denial logs or a live ls.
+#
+# Pie ueventd labels a freshly created node using the BEST match among the
+# devpath and all its symlinks (init/devices.cpp SelabelLookupBestMatch), so
+# labelling the stable by-name symlink paths below labels the real
+# /dev/block/mmcblk0pN nodes. (INFERENCE from AOSP 9 init source.)
+
+##########################
+# Block devices — by-name path live-verified on device [DEV]
+# (prefix /dev/block/platform/mtk-msdc.0/11230000.msdc0/by-name/)
+/dev/block/platform/mtk-msdc\.0/11230000\.msdc0/by-name/boot      u:object_r:boot_block_device:s0
+/dev/block/platform/mtk-msdc\.0/11230000\.msdc0/by-name/recovery  u:object_r:recovery_block_device:s0
+/dev/block/platform/mtk-msdc\.0/11230000\.msdc0/by-name/system    u:object_r:system_block_device:s0
+/dev/block/platform/mtk-msdc\.0/11230000\.msdc0/by-name/cache     u:object_r:cache_block_device:s0
+/dev/block/platform/mtk-msdc\.0/11230000\.msdc0/by-name/userdata  u:object_r:userdata_block_device:s0
+# No misc partition on this device: para carries the MTK BCB and our fstab
+# mounts it as /misc, so it gets the base misc_block_device label. [DEV]
+/dev/block/platform/mtk-msdc\.0/11230000\.msdc0/by-name/para      u:object_r:misc_block_device:s0
+/dev/block/platform/mtk-msdc\.0/11230000\.msdc0/by-name/frp       u:object_r:frp_block_device:s0
+/dev/block/platform/mtk-msdc\.0/11230000\.msdc0/by-name/nvram     u:object_r:nvram_device:s0
+/dev/block/platform/mtk-msdc\.0/11230000\.msdc0/by-name/nvdata    u:object_r:nvdata_device:s0
+/dev/block/platform/mtk-msdc\.0/11230000\.msdc0/by-name/nvcfg    u:object_r:nvcfg_device:s0
+/dev/block/platform/mtk-msdc\.0/11230000\.msdc0/by-name/protect1  u:object_r:protect_f_device:s0
+/dev/block/platform/mtk-msdc\.0/11230000\.msdc0/by-name/protect2  u:object_r:protect_s_device:s0
+/dev/block/platform/mtk-msdc\.0/11230000\.msdc0/by-name/expdb     u:object_r:expdb_block_device:s0
+/dev/block/platform/mtk-msdc\.0/11230000\.msdc0/by-name/logo      u:object_r:logo_block_device:s0
+/dev/block/platform/mtk-msdc\.0/11230000\.msdc0/by-name/seccfg    u:object_r:seccfg_block_device:s0
+/dev/block/platform/mtk-msdc\.0/11230000\.msdc0/by-name/proinfo   u:object_r:proinfo_block_device:s0
+/dev/block/platform/mtk-msdc\.0/11230000\.msdc0/by-name/lk        u:object_r:lk_block_device:s0
+/dev/block/platform/mtk-msdc\.0/11230000\.msdc0/by-name/lk2       u:object_r:lk_block_device:s0
+/dev/block/platform/mtk-msdc\.0/11230000\.msdc0/by-name/md1img    u:object_r:mdimg_block_device:s0
+/dev/block/platform/mtk-msdc\.0/11230000\.msdc0/by-name/md1dsp    u:object_r:mdimg_block_device:s0
+/dev/block/platform/mtk-msdc\.0/11230000\.msdc0/by-name/md1arm7   u:object_r:mdimg_block_device:s0
+/dev/block/platform/mtk-msdc\.0/11230000\.msdc0/by-name/md3img    u:object_r:mdimg_block_device:s0
+
+##########################
+# Connectivity — MTK WMT combo chip [DEV: all nodes in stock+our ueventd]
+/dev/stpwmt               u:object_r:stpwmt_device:s0
+/dev/wmtdetect            u:object_r:wmtdetect_device:s0
+/dev/wmtWifi              u:object_r:wmtWifi_device:s0
+/dev/stpbt                u:object_r:stpbt_device:s0
+/dev/stpgps               u:object_r:stpgps_device:s0
+/dev/gps                  u:object_r:stpgps_device:s0
+/dev/stpant               u:object_r:stpwmt_device:s0
+/dev/btif                 u:object_r:stpwmt_device:s0
+/dev/fm                   u:object_r:fm_device:s0
+
+##########################
+# Modem (CCCI) [DEV: nodes in stock ueventd]
+/dev/ccci.*               u:object_r:ccci_device:s0
+/dev/eemcs.*              u:object_r:ccci_device:s0
+/dev/emd.*                u:object_r:ccci_device:s0
+/dev/ttyC[0-9]*           u:object_r:ccci_device:s0
+# CCCI audio channels belong to the audio stack, not radio [DEV: stock ueventd
+# gives them audio:audio]
+/dev/ccci_pcm_rx          u:object_r:audio_device:s0
+/dev/ccci_pcm_tx          u:object_r:audio_device:s0
+/dev/ccci_aud             u:object_r:audio_device:s0
+/dev/ccci2_aud            u:object_r:audio_device:s0
+/dev/ccci3_aud            u:object_r:audio_device:s0
+# MTK UARTs [CONV: standard MTK 3.18 node name]
+/dev/ttyMT[0-9]*          u:object_r:serial_device:s0
+
+##########################
+# Graphics / GPU [DEV: mtkfb + Mali-T880 verified; nodes in our ueventd]
+/dev/fb[0-9]*             u:object_r:graphics_device:s0
+/dev/mtk_disp.*           u:object_r:graphics_device:s0
+/dev/mtkfb_vsync          u:object_r:graphics_device:s0
+# cmdq is used by the display/gralloc path [CONV: mt6797 kernel has the
+# driver; node not yet observed live]
+/dev/mtk_cmdq             u:object_r:graphics_device:s0
+/dev/sw_sync              u:object_r:sw_sync_device:s0
+/dev/mali                 u:object_r:gpu_device:s0
+/dev/mali[0-9]*           u:object_r:gpu_device:s0
+# GED (GPU extension device, kernel gpu/ged registers misc dev "ged") [DEV:
+# kernel source]
+/dev/ged                  u:object_r:gpu_device:s0
+/dev/MTK_SMI              u:object_r:MTK_SMI_device:s0
+
+##########################
+# Media / camera [DEV: nodes in our+stock ueventd]
+/dev/Vcodec               u:object_r:video_device:s0
+/dev/camera-isp           u:object_r:camera_isp_device:s0
+/dev/camera-sysram        u:object_r:camera_device:s0
+/dev/camera-fdvt          u:object_r:camera_device:s0
+/dev/camera-pipemgr       u:object_r:camera_device:s0
+/dev/kd_camera_hw         u:object_r:camera_device:s0
+/dev/kd_camera_flashlight u:object_r:camera_device:s0
+/dev/kd_camera_hw_bus2    u:object_r:camera_device:s0
+/dev/CAM_CAL_DRV[0-9]*    u:object_r:cam_cal_device:s0
+# [DEV 2026-08-07 live ls -laZ /dev] camera-dpe existed unlabeled (fell back to
+# plain "device"); hal3a/iopipe blobs open it. Same engine class as fdvt.
+/dev/camera-dpe           u:object_r:camera_device:s0
+# Lens actuator nodes: kernel main_lens.c/sub_lens.c device_create "MAINAF"/
+# "SUBAF"; libcam.hal3a.v3.so opens /dev/MAINAF and /dev/SUBAF [CONV: blob
+# strings]. hal_camera_default already holds camera_device rw.
+/dev/MAINAF               u:object_r:camera_device:s0
+/dev/SUBAF                u:object_r:camera_device:s0
+# /dev/devmap: devinfo (efuse) map, read-only. [FACT 2026-08-18, log-audit]
+# SeninfDrvImp (libcam.halsensor.so, camera provider) opens it on every camera
+# open and fell at DAC (0600 root:root, no ueventd rule) with errno 13 — the
+# node then carried the default "device" label, so after the DAC fix the open
+# would only convert into an avc denial. Dedicated type + r-only allows for
+# the two blob-string-proven readers (hal_camera_default, mediacodec).
+/dev/devmap               u:object_r:devmap_device:s0
+
+##########################
+# Sensors [DEV: node names taken from kernel/m685 hwmsen source; lsm6ds3 HAL
+# uses IIO (/dev/iio:deviceN is labelled iio_device by the base policy)]
+/dev/hwmsensor            u:object_r:hwmsensor_device:s0
+/dev/m_.*_misc            u:object_r:hwmsensor_device:s0
+
+##########################
+# Fingerprint (Goodix) + Trustonic TEE [DEV: goodix nodes in our ueventd;
+# mobicore node names are Trustonic convention, not yet observed live [CONV]]
+/dev/goodix_fp            u:object_r:fingerprint_device:s0
+/dev/goodix_fp_spi        u:object_r:fingerprint_device:s0
+/dev/mobicore             u:object_r:mobicore_device:s0
+/dev/mobicore-user        u:object_r:mobicore_user_device:s0
+
+##########################
+# Misc MTK nodes [DEV: all in stock/our ueventd]
+/dev/otp                  u:object_r:otp_device:s0
+/dev/mtgpio               u:object_r:mtgpio_device:s0
+/dev/irtx                 u:object_r:irtx_device:s0
+/dev/touch                u:object_r:touch_device:s0
+/dev/hotknot              u:object_r:hotknot_device:s0
+/dev/RT_Monitor           u:object_r:hang_detect_device:s0
+/dev/kick_powerkey        u:object_r:hang_detect_device:s0
+
+##########################
+# Sysfs entries relabelled by ueventd's cold-boot restorecon of /sys
+# [CONV: m681-template pattern; path not yet verified on m95]
+/sys/bus/platform/drivers/dev_info/dev_info    u:object_r:sysfs_dev_info:s0
+
+##########################
+# MTK NV / protected mounts [DEV: mount points from our fstab.mt6797]
+/nvdata(/.*)?             u:object_r:nvdata_file:s0
+/nvcfg(/.*)?              u:object_r:nvcfg_file:s0
+/protect_f(/.*)?          u:object_r:protect_f_data_file:s0
+/protect_s(/.*)?          u:object_r:protect_s_data_file:s0
+# Legacy NV location — init.mt6797.rc mkdirs /data/nvram [DEV]
+/data/nvram(/.*)?         u:object_r:nvdata_file:s0
+
+##########################
+# Data directories used by daemons
+# GPS/AGPS sockets + assistance data [DEV: paths from strings of vendor/bin/mnld]
+/data/misc/gps(/.*)?      u:object_r:mnld_data_file:s0
+/data/gps_mnl(/.*)?       u:object_r:mnld_data_file:s0
+/data/agps_supl(/.*)?     u:object_r:mnld_data_file:s0
+# [FACT 2026-08-14 GPS_LANE.md] mnld<->MPE sockets live here (mpe2mnl seen on
+# device); dir was created by init.m95.connectivity.rc but never labelled.
+/data/mpe_mnl(/.*)?       u:object_r:mnld_data_file:s0
+# Sensor calibration — init.mt6797.rc mkdirs /data/misc/sensor [DEV]
+/data/misc/sensor(/.*)?   u:object_r:mtk_sensor_data_file:s0
+# Trustonic runtime registry [CONV: Trustonic N-era layout, unverified]
+/data/app/mcRegistry(/.*)?  u:object_r:mcd_data_file:s0
+/data/mcRegistry(/.*)?      u:object_r:mcd_data_file:s0
+# Goodix template/calibration store — goodixfpd.rc mkdirs /data/gf_data
+# [DEV: the subdirectory names are string constants in
+# proprietary/lib64/libgf_hal.so; the daemon creates them itself underneath]
+/data/gf_data(/.*)?       u:object_r:gf_data_file:s0
+
+##########################
+# Device-local HAL services. AOSP's vendor file_contexts labels the stock name
+#   /(vendor|system/vendor)/bin/hw/android\.hardware\.audio@2\.0-service
+# only; our audio HAL binary carries the ".m95" suffix (it binds /dev/binder
+# instead of /dev/vndbinder, see audio_hal_service/service.cpp) so that anchored
+# regex does not match it. Result observed live [DEV, 2026-08-09]:
+#   ls -Z /vendor/bin/hw/android.hardware.audio@2.0-service.m95
+#     -> u:object_r:vendor_file:s0
+#   cat /proc/<pid of that service>/attr/current
+#     -> u:r:init:s0
+# i.e. no domain transition at all — the service runs in init's domain and every
+# rule in sepolicy/hal_audio_default.te is dead code. It only "works" today
+# because the device is Permissive (getenforce == Permissive).
+/(system/)?vendor/bin/hw/android\.hardware\.audio@2\.0-service\.m95  u:object_r:hal_audio_default_exec:s0
+
+# Fingerprint HAL. We ship the LineageOS @2.0-service (our blob is
+# module_api_version 2.0; AOSP's @2.1-service rejects it), and the AOSP vendor
+# file_contexts in this tree labels the @2.1 name ONLY. LineageOS does carry
+# the @2.0 label — device/lineage/sepolicy/common/vendor/file_contexts:2 — but
+# that directory is gated off for us: sepolicy.mk only adds it when
+# TARGET_USES_PREBUILT_VENDOR_SEPOLICY != true, and this device satisfies both
+# of its enabling conditions (TARGET_COPY_OUT_VENDOR is left at the default
+# `vendor`, BoardConfig.mk:88, and BOARD_VENDORIMAGE_FILE_SYSTEM_TYPE is unset
+# because there is no vendor partition), so it resolves to true and only
+# common/dynamic is picked up. Without the line below the HAL would run in
+# init's domain exactly like the audio service above.
+# The optional (\.m95) covers our device-local fork of that service
+# (device-18.1/meizu/m95/fingerprint): the module name had to differ from
+# the upstream one it is built alongside, and a file_contexts pattern has
+# to match the WHOLE path, so the plain @2.0-service line would miss it.
+/(system/)?vendor/bin/hw/android\.hardware\.biometrics\.fingerprint@2\.0-service(\.m95)?  u:object_r:hal_fingerprint_default_exec:s0
+
+##########################
+# System (non-vendor) executables.
+# goodixfingerprintd is a /system/bin daemon, so it must NOT be vendor_file_type.
+# It reuses the platform fingerprintd domain rather than defining a new one:
+# Pie still ships system/sepolicy/{public,private}/fingerprintd.te and that
+# domain already carries binder_use, keystore access, fingerprintd_data_file
+# and permission_service:find — everything a legacy fingerprint daemon needs.
+# The label matters even though goodixfpd.rc also sets `seclabel`: the domain's
+# entrypoint permission is on fingerprintd_exec, so under enforcing an
+# unlabelled (system_file) binary would fail to exec. m681 never added this and
+# only gets away with it because that port is permissive.
+/system/bin/goodixfingerprintd  u:object_r:fingerprintd_exec:s0
+# 2026-09-09, enforcing lane: on 18.1 this line matches NOTHING. The blob is
+# installed to /vendor/bin (vendor-18.1/meizu/m95/m95-vendor.mk:19), and the
+# live denial says so:
+#   avc: denied { entrypoint } path="/vendor/bin/goodixfingerprintd"
+#        scontext=u:r:fingerprintd:s0 tcontext=u:object_r:vendor_file:s0
+# Deliberately NOT fixed by relabelling the vendor path: fingerprintd_exec is
+# system_file_type (public/fingerprintd.te:2) and fingerprintd is a coredomain
+# (private/fingerprintd.te), so neither the label nor a vendor_file execute
+# grant is legal under public/domain.te:1328. The daemon needs a vendor domain
+# of its own -- full recipe in SELINUX_ENFORCING_PLAN.md §4.2. Under enforcing
+# as it stands today the daemon does not start and the fingerprint dies, so
+# this is a hard blocker, not a cosmetic one.
+
+##########################
+# Vendor executables (installed under /system/vendor in this semi-treble
+# build; pattern covers both roots). Binaries all exist in
+# vendor/meizu/m95/proprietary/vendor/bin [DEV], but none are started by our
+# init.mt6797.rc yet — domains are prepared for when services get added.
+/(system/)?vendor/bin/nvram_daemon        u:object_r:nvram_daemon_exec:s0
+# MTK picture-quality daemon; started property-gated from init.mt6797.rc.
+/(system/)?vendor/bin/pq                  u:object_r:pq_exec:s0
+/(system/)?vendor/bin/nvram_agent_binder  u:object_r:nvram_agent_binder_exec:s0
+/(system/)?vendor/bin/wmt_loader          u:object_r:wmt_loader_exec:s0
+/(system/)?vendor/bin/wmt_launcher        u:object_r:wmt_launcher_exec:s0
+/(system/)?vendor/bin/wmt_concurrency     u:object_r:wmt_concurrency_exec:s0
+/(system/)?vendor/bin/mnld                u:object_r:mnld_exec:s0
+/(system/)?vendor/bin/mtk_agpsd           u:object_r:mtk_agpsd_exec:s0
+/(system/)?vendor/bin/mcDriverDaemon      u:object_r:mcd_exec:s0
+/(system/)?vendor/bin/fuelgauged          u:object_r:fuelgauged_exec:s0
+/(system/)?vendor/bin/batterywarning      u:object_r:batterywarning_exec:s0
+/(system/)?vendor/bin/ccci_fsd            u:object_r:ccci_fsd_exec:s0
+/(system/)?vendor/bin/ccci_mdinit         u:object_r:ccci_mdinit_exec:s0
+/(system/)?vendor/bin/emdlogger[0-9]+     u:object_r:emdlogger_exec:s0
+/(system/)?vendor/bin/flashlessd          u:object_r:flashlessd_exec:s0
+/(system/)?vendor/bin/gsm0710muxd         u:object_r:gsm0710muxd_exec:s0
+/(system/)?vendor/bin/gsm0710muxdmd2      u:object_r:gsm0710muxd_exec:s0
+/(system/)?vendor/bin/mdlogger            u:object_r:mdlogger_exec:s0
+# MTK rild variants run in the base `rild` domain — reuse its full radio
+# privilege set instead of redeclaring it.
+/(system/)?vendor/bin/mtkrild             u:object_r:rild_exec:s0
+/(system/)?vendor/bin/mtkrildmd2          u:object_r:rild_exec:s0
+/(system/)?vendor/bin/rilproxy            u:object_r:rilproxy_exec:s0
+/(system/)?vendor/bin/statusd             u:object_r:statusd_exec:s0
+/(system/)?vendor/bin/terservice          u:object_r:terservice_exec:s0
+/(system/)?vendor/bin/viarild             u:object_r:viarild_exec:s0
+/data/misc/akmd_set\.txt    u:object_r:sensor_calib_file:s0
+
+##########################
+# mtkrild's OEM control socket.
+#
+# FACT: declared at rootdir/init.m95.modem.rc:139 as
+#   socket rild-oem stream 660 radio system
+# inside `service ril-daemon-mtk /vendor/bin/hw/rild` (:131), so INIT creates
+# it, and Android 9 init looks the path up in the file_contexts handle and sets
+# fscreate before creating the node. Proof that this works on this device:
+# /dev/socket/rild-debug, declared on the adjacent line (:138), comes up
+# labelled rild_debug_socket, which can only come from plat file_contexts:152.
+#
+# FACT: without this line the node comes up u:object_r:socket_device:s0 (live
+# `ls -laZ /dev/socket/rild-oem`, 2026-08-10) because plat_file_contexts labels
+# only /dev/socket/rild and /dev/socket/rild-debug, and everything else in
+# /dev/socket falls through to the socket_device default.
+#
+# The consumer is /vendor/bin/thermal (init.m95.thermal.rc:43, user/group
+# system, which satisfies the 0660 radio:system DAC). It is the modem thermal
+# control channel - `strings -a /vendor/bin/thermal` carries "rild-oem",
+# "MDTM_TOG,%d", "set_md_toggle_throttle cur=%d set=%d", "setMdTpThreshold",
+# "recvMdThermalInfo", "queryMdThermalInfo". See sepolicy/init.te for why the
+# label matters and what it replaces.
+#
+# rild_socket is the AOSP type (system/sepolicy/public/file.te:340), reused
+# rather than minted so that the platform's own
+# `neverallow { appdomain -radio } rild_socket:sock_file write` keeps applying.
+/dev/socket/rild-oem        u:object_r:rild_oem_socket:s0
+
+# The IMS command socket from the same service block (init.m95.modem.rc:137),
+# typed for its first client, volte_kicker — see file.te / volte_kicker.te.
+/dev/socket/rild-ims        u:object_r:rild_ims_socket:s0
+/dev/socket/rild-mal        u:object_r:rild_mal_socket:s0
+/dev/socket/wod_action      u:object_r:epdg_wod_socket:s0
+/dev/socket/wod_sim         u:object_r:epdg_wod_socket:s0
+/dev/socket/wod_ipsec       u:object_r:epdg_wod_socket:s0
+/data/ipsec(/.*)?           u:object_r:epdg_wod_data_file:s0
+/(system/)?vendor/bin/volte_kicker    u:object_r:volte_kicker_exec:s0
+/(vendor|system/vendor)/bin/mtkmal    u:object_r:mtkmal_exec:s0
+
+##########################
+# 2026-08-14 census additions.
+
+# MTK thermal daemon set + ePDG WoD daemon — exec types for the domains in
+# sepolicy/thermal.te (mtkmal pattern: transition must come from the binary
+# label because `seclabel` is dead until the init-nopolicy g_policy_loaded
+# fix ships — see init.te — and epdg_wod is started from a vendor-image rc
+# this tree cannot edit anyway). FACT (ps -AZ 2026-08-14): all five ran as
+# u:r:init:s0.
+/(system/)?vendor/bin/thermal             u:object_r:thermal_exec:s0
+/(system/)?vendor/bin/thermald            u:object_r:thermald_exec:s0
+/(system/)?vendor/bin/thermalloadalgod    u:object_r:thermalloadalgod_exec:s0
+/(system/)?vendor/bin/thermal_manager     u:object_r:thermal_manager_exec:s0
+/(system/)?vendor/bin/epdg_wod            u:object_r:epdg_wod_exec:s0
+
+# libmtcloader's persisted thermal policy selection (mkdir'd by
+# init.m95.thermal.rc post-fs-data; init labels mkdir'd dirs from this file).
+/data/\.tp(/.*)?            u:object_r:thermal_data_file:s0
+
+# Trustonic runtime registry actually used by mcDriverDaemon. FACT
+# (2026-08-14): live tree is /data/misc/mcRegistry/TbStorage/<uuid>/<hash>,
+# ALL of it u:object_r:system_data_file:s0 — the entries this file carried
+# labelled /data/mcRegistry and /data/app/mcRegistry, neither of which the
+# daemon touches (gap first reported in rootdir/init.m95.tee.rc:5-9). The
+# denials in the census are mcd on its own store:
+#   avc: denied { read open getattr } .../TbStorage/0506.../7f72...
+#   avc: denied { write add_name } dir 0506... / 90e6....new
+# tee.te already grants mcd create on mcd_data_file — the label is the whole
+# fix. Existing dirs need a restorecon (init.m95.tee.rc does it now).
+/data/misc/mcRegistry(/.*)?  u:object_r:mcd_data_file:s0
+
+# Modem filesystem daemon working tree: modem NVRAM (MF5U_001, MF80_001) and the
+# GPS working files. It needs its own type so ccci_fsd can write there without
+# widening generic system_data_file, which domain.te:1181 forbids outright.
+/data/md3(/.*)?    u:object_r:ccci_data_file:s0
+
+# ADC calibration node written by nvram_daemon during first-boot NV setup.
+/dev/mtk-adc-cali    u:object_r:mtk_adc_cali_device:s0
+/data/iNemoEngine_gbias\.dat    u:object_r:mtk_sensor_data_file:s0
+
+# mtkmal's own control sockets (file.te mtkmal_socket). Created by init from
+# /vendor/etc/init/init.mal.rc; the -dongle twins exist only under ril.mal=2.
+/dev/socket/mal-mfi              u:object_r:mtkmal_socket:s0
+/dev/socket/mal-mfi-dongle       u:object_r:mtkmal_socket:s0
+/dev/socket/volte_imsm           u:object_r:mtkmal_socket:s0
+/dev/socket/volte_imsm_dongle    u:object_r:mtkmal_socket:s0
+
+# VoLTE AP-stack daemons (sepolicy/volte_daemons.te; services in
+# rootdir/init.m95.volte.rc, started and stopped by mtkmal's ctl properties).
+/(vendor|system/vendor)/bin/volte_ua      u:object_r:volte_ua_exec:s0
+/(vendor|system/vendor)/bin/volte_stack   u:object_r:volte_stack_exec:s0
+/(vendor|system/vendor)/bin/volte_imcb    u:object_r:volte_imcb_exec:s0
+
+# VoLTE daemon sockets (file.te types; declared in rootdir/init.m95.volte.rc).
+# Without these lines they come up socket_device and every cross-daemon
+# connect falls to the unlabeled-socket fallback (2026-08-21 census #1).
+/dev/socket/volte_stack     u:object_r:volte_stack_socket:s0
+/dev/socket/volte_ua        u:object_r:volte_ua_socket:s0
+/dev/socket/volte_imsa1     u:object_r:volte_imcb_socket:s0
+/dev/socket/volte_imsa2     u:object_r:volte_imcb_socket:s0
+/dev/socket/volte_imsvt1    u:object_r:volte_imcb_socket:s0
+/dev/socket/volte_imsvt2    u:object_r:volte_imcb_socket:s0
+/dev/socket/volte_ut        u:object_r:volte_imcb_socket:s0
+
+##########################
+# Same-process HALs.
+#
+# FACT (captures/a11-20260906/lastkmsg-v{6,7}.txt, three boots): zygote and
+# mediaserver take `execute` denials on plain /vendor libraries --
+#   avc: denied { execute } comm="main" path="/vendor/lib/libged.so"
+#        scontext=u:r:zygote:s0 tcontext=u:object_r:vendor_file:s0
+#   avc: denied { execute } ... path="/vendor/lib/libgralloc_extra.so" ...
+# and public/domain.te:1328-1343 forbids every coredomain `vendor_file:file
+# { execute open }` with no exemption for zygote. So under enforcing this
+# cannot be granted: the libraries have to carry the type AOSP made for
+# exactly this case.
+#
+# same_process_hal_file is that type: it is vendor_file_type (so it stays
+# legal on /vendor), and private/zygote.te:173, private/system_server.te:268,
+# private/webview_zygote.te:76, private/rs.te:27 and private/gpuservice.te:17
+# already grant those five core domains { execute read open getattr map } on
+# it. Vendor domains get it wholesale from public/domain.te:175-179.
+#
+# The set below is the passthrough graphics stack and its DT_NEEDED closure on
+# /vendor, read off the built image with readelf, not guessed:
+#   libGLES_mali.so    -> libm95shim_region, libged, libgpu_aux, libgralloc_extra
+#   gralloc.mt6797.so  -> libm95shim_utils, libm95probe, libgralloc_extra, libion_mtk
+#   libgralloc_extra   -> libged, libion_mtk
+# Everything else in those closures (libbinder, libutils, libcutils, libhardware,
+# libsync, libutilscallstack, libion, libGLESv1_CM) resolves from /system and is
+# not on /vendor at all, so it needs no entry here.
+#
+# Deliberately NOT listed, because system/sepolicy/vendor/file_contexts:83-88
+# already carries them: android.hardware.graphics.mapper@*-impl*.so,
+# android.hardware.renderscript@1.0-impl.so, gralloc.default.so, libhwbinder.so,
+# libhidltransport.so. The gralloc line below is still needed -- AOSP names only
+# gralloc.default.so, and our real module is gralloc.mt6797.so.
+/(vendor|system/vendor)/lib(64)?/hw/gralloc\..*\.so     u:object_r:same_process_hal_file:s0
+/(vendor|system/vendor)/lib(64)?/libged\.so             u:object_r:same_process_hal_file:s0
+/(vendor|system/vendor)/lib(64)?/libgpu_aux\.so         u:object_r:same_process_hal_file:s0
+/(vendor|system/vendor)/lib(64)?/libgralloc_extra\.so   u:object_r:same_process_hal_file:s0
+/(vendor|system/vendor)/lib(64)?/libion_mtk\.so         u:object_r:same_process_hal_file:s0
+/(vendor|system/vendor)/lib(64)?/libm95shim_region\.so  u:object_r:same_process_hal_file:s0
+/(vendor|system/vendor)/lib(64)?/libm95shim_utils\.so   u:object_r:same_process_hal_file:s0
+/(vendor|system/vendor)/lib(64)?/libm95probe\.so        u:object_r:same_process_hal_file:s0
+
+# A13 GSI (FACT 2026-09-11): the AOSP regex covers only ...-service, not the
+# .software variant this device installs; unlabeled -> init refuses to start it
+# -> LockSettingsService NPE on IGateKeeper.
+/(vendor|system/vendor)/bin/hw/android\.hardware\.gatekeeper@1\.0-service\.software  u:object_r:hal_gatekeeper_default_exec:s0

@@ -1,0 +1,208 @@
+# M95 early ramdisk properties.
+#
+# This is intentionally a regular file in the boot ramdisk. With split
+# property overrides, the generic Pie build otherwise creates /default.prop as
+# a symlink to /system/etc/prop.default, but /system is not mounted when init
+# selects init.${ro.zygote}.rc.
+ro.secure=0
+ro.debuggable=1
+ro.adb.secure=0
+ro.zygote=zygote64_32
+ro.zygote.disable_gl_preload=true
+persist.sys.usb.config=adb
+persist.service.adb.enable=1
+
+# adbd drives FunctionFS through AIO by default, but this kernel's
+# drivers/usb/gadget/f_fs.c is the old flat MTK backport with no AIO at all
+# (ffs_epfile_operations exposes only .read/.write/.open/.release/
+# .unlocked_ioctl). io_submit then fails with EINVAL, which is the
+# "adbd: aio: got error submitting read: Invalid argument" ->
+# "closing functionfs transport" sequence in boot b10, and the permanent
+# `offline` state in b11. This property is adbd's own switch to the blocking
+# read/write path; it is read at adbd startup, so it has to be a boot default
+# rather than something set later. [FACT: the string is present in
+# out/target/product/m95/system/bin/adbd.]
+sys.usb.ffs.aio_compat=1
+
+# PackageManagerServiceCompilerMapping.checkProperties() reads all seven
+# pm.dexopt.* reasons at PMS.main() and throws IllegalStateException if any is
+# empty, which aborts system_server before it publishes a single service.
+# Observed 68 times in captures/m95-boot-20260807/m95-logcat-1821.txt:
+#   java.lang.IllegalStateException: PMS compiler filter settings are bad.
+#     Suppressed: ... Value "" not valid (reason first-boot|boot|install|
+#                     bg-dexopt|ab-ota|inactive|shared)
+#   at PackageManagerServiceCompilerMapping.checkProperties(...:92)
+# This donor /system/build.prop ships zero pm.dexopt entries and nothing else
+# provides them. [FACT: `getprop | grep pm.dexopt` on the booted device is
+# empty.]
+#
+# device.mk already carries the same seven as PRODUCT_PROPERTY_OVERRIDES, but
+# those only land in /system/build.prop when the ROM is rebuilt. We flash
+# "fresh kernel + our ramdisk" images, which never regenerate /system, so they
+# have to be boot defaults as well. Values match device.mk - keep the two in
+# sync.
+# Modem-type selectors the MTK radio blobs gate on, shipped by stock as
+# ordinary /system/build.prop lines (322-341 in the donor) — NOT LK cmdline
+# entries (FACT: stock recovery kernel /proc/cmdline has no androidboot.opt_*,
+# read live 2026-08-07). On the boot captured in
+# captures/m95-boot-20260807/m95-logcat-1821.txt all of these were unset:
+#  - gsm0710muxd gates on ro.boot.opt_md1_support (then md2/md5); all zero ->
+#    "ccci_get_node_name unknown, default tablet=/dev/ttyUSB1" -> ENOENT ->
+#    muxer dies -> no /dev/radio/ptty* -> mtk-ril loops on pttynoti.
+#    Nonzero -> the binary's version table maps /sys/kernel/ccci/version
+#    1/2/3/5/6 all to /dev/ttyC0 (our kernel says 3; stock kernel says 6).
+#  - ccci_mdinit 2 gates on ro.boot.opt_md3_support (default "0"): it logs
+#    "md3 not enable!" and exits -> MD3/C2K never boots, mtk.md3.status is
+#    never set, mtk_agpsd spins ("retry times = N, tempstr = 0").
+# init sets ro.boot.* from androidboot.* BEFORE loading this file, and none
+# of these keys are on the cmdline, so the values below stick. Same
+# ramdisk-vs-build.prop rationale as pm.dexopt.* below; keep in sync with
+# system.prop.
+ro.boot.opt_md1_support=12
+ro.boot.opt_md3_support=2
+ro.boot.opt_lte_support=1
+ro.boot.opt_irat_support=1
+ro.boot.opt_c2k_support=1
+ro.boot.opt_c2k_lte_mode=2
+ro.boot.opt_eccci_c2k=1
+ro.boot.opt_using_default=1
+ro.telephony.sim.count=2
+
+# Do NOT add ro.sys.sdcardfs=false here. It looks like the fix for the
+# sdcard daemon aborting at boot ("sdcard.cpp:176] failed to sdcardfs_setup")
+# and it is not: tried on this device 2026-08-09, the property is read - the
+# log duly changes to "Device explicitly disabled sdcardfs" - and the daemon
+# mounts sdcardfs anyway, because should_use_sdcardfs() returns
+# !supports_esdfs() on that branch and this kernel has no esdfs. Pie's sdcard
+# has exactly two backends, sdcardfs and esdfs; the FUSE path was removed.
+# The real fix is in the kernel, teaching sdcardfs 2.1.3 the Android P option
+# names - see kernel/m685/fs/sdcardfs/main.c.
+
+pm.dexopt.first-boot=quicken
+pm.dexopt.boot=verify
+pm.dexopt.install=quicken
+pm.dexopt.bg-dexopt=speed-profile
+pm.dexopt.ab-ota=speed-profile
+pm.dexopt.inactive=verify
+pm.dexopt.shared=speed
+
+# Silence AudioParamParser. This is log suppression, NOT a fix - the defect
+# below is unfixable from our side and is harmless. Read the whole comment
+# before touching it.
+#
+# The MTK audio param parser runs a watcher thread (appHandleThreadLoop) that
+# retries inotify_add_watch forever when the watch cannot be established.
+# [FACT, strace of tid 663 in android.hardware.audio@2.0-service.m95, live on
+# 95AHACQC5KQVM 2026-08-10:]
+#   inotify_add_watch(9, "/sdcard/.audio_param/", IN_ACCESS|IN_MODIFY|...)
+#       = -1 EACCES (Permission denied)
+# repeated once per second. Confirmed from the other side too: /proc/366/
+# fdinfo/9 is an inotify instance with zero "inotify wd:" lines, i.e. no watch
+# was ever installed.
+#
+# The path is /sdcard, NOT the audio_param dirs. The two one-time
+# "Scandir error (/odm/etc/audio_param/)" and "(/system/etc/audio_param/)"
+# lines that appear just before the flood are a separate, unrelated cosmetic
+# complaint - the parser does find its XMLs in /vendor/etc/audio_param/.
+# Do not "fix" this by creating those directories; it will not stop the loop.
+#
+# Why EACCES: /sdcard -> /storage/self/primary is sdcardfs, mounted
+# gid=1015,mask=6, so /sdcard/.audio_param is root:sdcard_rw 0771 [FACT: ls
+# -ldZ on device]. The HAL is uid 1041 gid 1005 with groups 1006 1013 1026
+# 1031 3001 3002 3003 3007 3010 [FACT: /proc/366/status] - not sdcard_rw, so
+# "other" applies: --x, traverse but no read. inotify_add_watch needs read on
+# the inode. SELinux is not the blocker here; the matching hal_audio_default
+# -> storage_file denials in dmesg are all permissive=1.
+#
+# This is the MTK "drop tuning XMLs on the sdcard and they hot-reload" dev
+# feature, and it is already switched off - "isCustXmlEnable(), Get cust xml
+# enabled from AudioSystem: 0" - but the blob starts the watcher thread
+# anyway. Both the watcher (libaudio_param_parser.so, which holds the literal
+# "/sdcard/.audio_param/" in .rodata at 0x2192b) and its caller
+# (audio.primary.mt6797.so, imports appHandleInit) are prebuilts, so no
+# in-tree config can redirect the path.
+#
+# DO NOT fix this by giving the HAL sdcard_rw/media_rw in
+# audio_hal_service/android.hardware.audio@2.0-service.m95.rc. It would work,
+# and it is the wrong trade: it grants a vendor HAL read access to all of user
+# storage, and it switches the hot-reload feature ON, so any app with sdcard
+# write access could retune audio by dropping an XML. That changes audio
+# behaviour we have verified works, to silence a log line.
+#
+# Cost of the line below: it hides *all* AudioParamParser output, including
+# the scandir lines above and any future genuine error from this tag. Accepted
+# because all known output from this tag is noise, and this one message was
+# 13708 of the 15811 error lines in the main buffer (87%).
+#
+# Cheap to verify it still bites: `setprop log.tag.AudioParamParser ""` on a
+# live device brings the flood straight back.
+#
+# Not a CPU or thermal problem, in case that is why you are here: the retry is
+# 1 Hz with a 1 s sleep, not a spin. Measured 20 log lines in 20 s, and tid
+# 663 burned 2 jiffies over those 20 s (~0.1% of one core; 26 s of CPU across
+# 8.5 h of uptime). Suppressing the log does not make the device cooler.
+#
+# liblog applies this in __android_log_is_loggable_len() inside the write
+# path, so it works even though the blob only imports __android_log_print and
+# never checks is_loggable itself [FACT: system/core/liblog/logger_write.c:352;
+# readelf --dyn-syms on libaudio_param_parser.so shows __android_log_print as
+# its only liblog import]. Verified live: with the property set, 0 lines in
+# 10 s; cleared again, the 4-lines-per-10 s baseline returned.
+# Note ro.log.tag.* is explicitly NOT supported (liblog properties.c:109) -
+# it has to be log.tag.* or persist.log.tag.*. Keep in sync with system.prop.
+log.tag.AudioParamParser=S
+
+# Hide the SensorHAL akm_log debug flood. Like AudioParamParser above, this
+# is suppression of noise from an unfixable blob, not a fix - read before
+# touching.
+#
+# The sensor HAL blob sensors.lsm6ds3.so prints the AKM magnetometer
+# calibration statistic
+#   D SensorHAL: akm_log sensorT=%d,stdev,%f,%f,%f
+# in bursts of 4-8 lines every 20-40 ms, camera on or off. [FACT, live m95
+# 2026-08-17: 2409 of the last 3000 main-buffer lines, ~520 lines/s.] The
+# format string and the single LOG_TAG "SensorHAL" sit in the blob itself
+# [FACT: strings -t x, offsets 0x31259 and 0x2ff19]. At that rate the main
+# log buffer holds only a few seconds of history, which is what killed the
+# forensic value of every capture taken while it ran.
+#
+# History: the same call site used to print at ERROR and was downgraded to
+# DEBUG by the hash-guarded binary edit in
+# tools/blobpatch/sensors-lsm6ds3-akm-log-level.py (see COMPONENT_STATUS.md
+# section 10.5). That edit fixed the *severity* mislabel; this property fixes
+# the *volume*. They compose: the line is a D now, so a threshold of I drops
+# it in the writer process before the socket write (liblog
+# __android_log_is_loggable_len(), same mechanism as documented for
+# AudioParamParser above).
+#
+# Level I, NOT S, deliberately: the blob has 126 other ALOGE call sites under
+# this same tag and some of them are real sensor errors - S would hide those
+# too. I only drops V and D, and the only known D-flood is akm_log.
+#
+# Verified live 2026-08-17: `setprop log.tag.SensorHAL S` cut a 5-second
+# window from 2595 lines to 812; the remainder is other tags. To get the
+# statistic back for magnetometer diagnosis on a live device:
+#   setprop log.tag.SensorHAL D    (or "" to clear)
+# - no reboot, no reflash. Keep in sync with system.prop.
+log.tag.SensorHAL=I
+
+# Camera2 / HAL3 by default.
+#
+# FACT (live, 2026-08-10): with this set before the provider starts, m95 surfaces
+# a real device@3.3 alongside the device@1.0 alias AOSP adds for API1 clients,
+# configure_streams succeeds on 1920x1088 YUV and 640x480 preview, frames flow,
+# and the preview renders. Both cameras report supportedHardwareLevel FULL with
+# MANUAL_SENSOR, MANUAL_POST_PROCESSING, READ_SENSOR_SETTINGS, RAW and
+# BURST_CAPTURE, rear active array 4032x3016, PER_FRAME_CONTROL, ISO 100-6400 -
+# all authored by MediaTek's own IMX386/OV5695 metadata constructors, with no
+# patching. Without it the device is HAL1 behind the legacy shim and apps see
+# LEGACY: no manual exposure, no RAW, no burst.
+#
+# Read by NSCam::CamDeviceManagerImp::enumDeviceLocked at PROVIDER INIT, so it
+# must be a boot property - setting it on a running provider does nothing. That
+# cost one wasted debugging round.
+#
+# NOT a claim the camera is fixed: the preview truncation is present under HAL3
+# too (it follows the shared P1/P2 path, not the HAL1-only DisplayClient), so
+# this changes which API apps get, not whether the frame is whole.
+debug.camera.force_device=3

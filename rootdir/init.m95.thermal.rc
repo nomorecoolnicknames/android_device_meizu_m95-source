@@ -1,0 +1,60 @@
+# Thermal management — Meizu MX6 (m95, MT6797).
+#
+# The MT6797 has two thermal layers and we were running on only one of them.
+#
+# The kernel layer works: drivers/misc/mediatek/thermal drives mtktscpu and
+# friends and limits CPU power on its own. It is visible in dmesg as
+#   [CPU_Thermal]set_adaptive_cpu_power_limit 3791 T=76300, ... T=76800
+# Those are SoC self-protection trip points, and they are deliberately high.
+#
+# The product layer is the MTK thermal daemon set, which reads the tuned
+# policies in /vendor/etc/.tp (thermal.conf, thermal.{low,mid,high,off}.conf,
+# .thermal_policy_0[0-3], .ht120.mtc) and applies the limits Meizu actually
+# shipped, including skin/battery/charger temperature. We install every one of
+# those binaries and every one of those policy files (m95-vendor.mk:176-202),
+# but no init .rc in our tree ever started any of them - `grep -rn thermal
+# los/device/meizu/m95/rootdir/*.rc` returned nothing before this file existed.
+# So the device ran to SoC-protection limits only, and got hot in the hand.
+#
+# Definitions below are copied from the stock ramdisk, init.mt6797.rc:1383-1403
+# (extracted from stock/boot.img), including the user/group split - thermald,
+# thermal and thermalloadalgod run as system, thermal_manager runs as root and
+# is oneshot.
+#
+# /vendor is a symlink to /system/vendor in our ramdisk, so these paths resolve
+# to the files m95-vendor.mk installs under system/vendor/bin.
+#
+# NOTE for the move to enforcing: these are vendor daemons touching
+# /proc/driver/thermal, /sys/class/thermal and the .tp policy files, so they
+# will need their own SELinux domains. SELinux is Permissive during bring-up
+# (verified with getenforce), so they run today regardless.
+
+# Stock parity (stock init.mt6797.rc:542). libmtcloader persists the active
+# policy selection in /data/.tp/.settings; without the directory every
+# thermal_manager run logs "mtcloader fails to open .tp.settings and
+# exits!errno 2" (FACT 2026-08-14) and falls back to the default policy
+# instead of the tuned per-state Meizu policies, and change_policy can
+# never persist a selection.
+on post-fs-data
+    mkdir /data/.tp 0775 system system
+
+service thermalloadalgod /vendor/bin/thermalloadalgod
+    class main
+    user system
+    group system
+
+service thermal_manager /vendor/bin/thermal_manager
+    class main
+    user root
+    group system
+    oneshot
+
+service thermal /vendor/bin/thermal
+    class main
+    user system
+    group system
+
+service thermald /vendor/bin/thermald
+    class main
+    user system
+    group system

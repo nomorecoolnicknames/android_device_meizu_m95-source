@@ -1,0 +1,35 @@
+# Binder services added by this device.
+type nvram_agent_service, service_manager_type, vendor_service;
+# IGoodixFingerprintDaemon is a plain (non-HIDL) binder service registered by
+# goodixfingerprintd and looked up by the fingerprint.default.so shim that the
+# HAL dlopens. FACT: "android.hardware.fingerprint.IGoodixFingerprintDaemon" is
+# a string in proprietary/bin/goodixfingerprintd, next to "Couldn't register
+# goodixfingerprintd binder service!". Note m681 also declares
+# goodix_fingerprint_service for "com.goodix.FingerprintService"; that string
+# does NOT occur in the m95 binary, so we do not carry the type.
+type goodixfingerprintd_service, service_manager_type;
+# GuiExtService — MTK SurfaceFlinger/gralloc extension service. FACT
+# (2026-08-14): `vndservice list` on the live device shows exactly one
+# vndservice, "GuiExtService: [GuiExtService]" (the framework `service list`
+# does NOT carry it), and the census shows hal_graphics_composer_default
+# { add } on what fell through to default_android_vndservice. Entry lives in
+# vndservice_contexts only; vndservice_manager_type is what vndservicemanager
+# checks. service_manager_type kept so a framework-side registration, if one
+# ever appears, can reuse the type instead of default_android_service.
+# R-SPLIT: vndservice_manager_type dropped. GuiExtService registers with
+# the framework servicemanager (native N service, LOS16 design); carrying
+# the vnd attr trips the coredomain-vs-vendor-services neverallow
+# (domain.te:692) for every coredomain with a generic vndservice find.
+type guiext_service, service_manager_type, vendor_service;
+# "SurfaceFlinger" as seen on vndbinder (decode lane 2026-08-15, VENC_LANE.md):
+# surfaceflinger mirrors its registration there via ro.vendor.sf.vndbinder +
+# tools/patches/surfaceflinger-publish-vndbinder.patch, because the MTK GuiExt
+# pool in composer@2.1-service getService()s it on /dev/vndbinder before
+# MtkOmxVdec can get surface output buffers. Distinct type on purpose: the
+# framework-side "SurfaceFlinger" keeps its platform surfaceflinger_service
+# label, this one only exists in vndservice_contexts.
+type surfaceflinger_vndservice, vndservice_manager_type;
+
+# MTK picture-quality daemon's binder service. The registered name is "PQ",
+# read off a live device from the denial itself (see pq.te). [DEV]
+type pq_service, service_manager_type, vendor_service;

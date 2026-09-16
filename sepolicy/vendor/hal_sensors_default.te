@@ -1,0 +1,53 @@
+# sensors.mt6797 / sensors.alsps / sensors.lsm6ds3 inside sensors@1.0-service.
+# Evidence: sensors.alsps.so reads /sys/class/meizu/{als,ps} and scans
+# /dev/input [DEV: blob strings]; sensors.lsm6ds3.so uses IIO
+# (/dev/iio:deviceN, /sys/bus/iio) [DEV: blob strings]; the MTK hwmsen nodes
+# (/dev/hwmsensor, /dev/m_*_misc) exist in the kernel [DEV: kernel source].
+
+allow hal_sensors_default hwmsensor_device:chr_file rw_file_perms;
+allow hal_sensors_default iio_device:chr_file rw_file_perms;
+allow hal_sensors_default sysfs_meizu:dir r_dir_perms;
+allow hal_sensors_default sysfs_meizu:file rw_file_perms;
+allow hal_sensors_default sysfs:file r_file_perms;
+# alsps enumerates /dev/input for its event node
+allow hal_sensors_default input_device:dir r_dir_perms;
+allow hal_sensors_default input_device:chr_file r_file_perms;
+# calibration in /data/misc/sensor (created 0777 by init.mt6797.rc [DEV])
+allow hal_sensors_default mtk_sensor_data_file:dir create_dir_perms;
+allow hal_sensors_default mtk_sensor_data_file:file create_file_perms;
+r_dir_file(hal_sensors_default, nvdata_file)
+
+# Compass calibration must survive a reboot.
+#
+# FACT (live device, 2026-08-10): enabling the magnetometer trips
+#   avc: denied { write open getattr } for path="/data/misc/akmd_set.txt"
+#        scontext=u:r:hal_sensors_default:s0 tcontext=u:object_r:system_data_file:s0
+# permissive=1, so it proceeds today and the calibration is written.
+#
+# Under enforcing it would not. The compass would still register, still deliver
+# live field data (verified: ~58 uT, correct for Earth's field), and still look
+# perfectly healthy - but its calibration would be discarded on every reboot,
+# so headings would drift and need re-calibrating after each boot with nothing
+# in the logs to explain it once the denial is no longer printed.
+#
+# Third instance of the same class as the LSC shading cache and the Goodix
+# netlink socket: invisible under permissive, broken the moment enforcing lands.
+allow hal_sensors_default sensor_calib_file:file create_file_perms;
+allow hal_sensors_default sensor_calib_file:dir rw_dir_perms;
+
+# IIO attribute writes — 2026-08-14 census. The lsm6ds3 HAL configures its
+# IIO devices through generic-labelled sysfs:
+#   avc: denied { write } name="sampling_frequency" (x5) and
+#        name="in_anglvel_x_en" — scontext=u:r:hal_sensors_default:s0
+#        tcontext=u:object_r:sysfs:s0
+#   avc: denied { read open } dir name="scan_elements"
+# Under enforcing the gyro/accel ODR and channel-enable writes fail and the
+# sensors stream at power-on defaults. The paths live under
+# /sys/devices/platform/.../iio:deviceN with an unstable i2c segment, so a
+# genfscon cannot carve them out; the grant stays on the generic label and is
+# the reason this file's read-only line above is now rw.
+# (The magnetometer "Failed to write sampling frequency" log line is NOT this
+# under a different name: that write reaches the driver and is rejected with
+# EINVAL by the EXT0-slave ODR list — cosmetic, see COMPONENT_STATUS #22.)
+allow hal_sensors_default sysfs:dir r_dir_perms;
+allow hal_sensors_default sysfs:file rw_file_perms;

@@ -1,0 +1,85 @@
+# Goodix fingerprint daemon — /system/bin/goodixfingerprintd.
+#
+# No new domain is declared here. Pie still ships the legacy fingerprintd
+# domain (system/sepolicy/public/fingerprintd.te declares `fingerprintd` and
+# `fingerprintd_exec`; private/fingerprintd.te makes it coredomain and calls
+# init_daemon_domain), and it already grants binder_use, use_keystore,
+# add_auth on keystore keys, fingerprintd_data_file, permission_service:find
+# and ion_device — the full set a legacy fingerprint daemon needs. goodixfpd.rc
+# pins the daemon into it with `seclabel u:r:fingerprintd:s0`, and
+# sepolicy/file_contexts labels the binary fingerprintd_exec so the entrypoint
+# check passes under enforcing. Same shape as device/meizu/m681/sepolicy.
+#
+# Everything below is what the platform domain does NOT already cover.
+
+##########################
+# The binder service the daemon publishes. fingerprint.default.so (dlopened by
+# the @2.0-service, i.e. hal_fingerprint_default) is the only client.
+allow fingerprintd goodixfingerprintd_service:service_manager { add find };
+allow hal_fingerprint goodixfingerprintd_service:service_manager find;
+
+# IGoodixFingerprintDaemonCallback means traffic runs both ways: the HAL calls
+# in to enroll/authenticate, the daemon calls back with results.
+binder_call(hal_fingerprint, fingerprintd)
+binder_call(fingerprintd, hal_fingerprint)
+
+##########################
+# Sensor + TEE. /dev/goodix_fp is 230,0 system:system 0660, labelled
+# fingerprint_device by sepolicy/file_contexts [DEV: verified live on device].
+# The daemon opens it directly and drives the sensor through libgf_hal; it is
+# also the only writer of GF_IOC_INPUT_KEY_EVENT, which is what turns an mBack
+# tap into KEY_BACK on the fp-keys input node (see keylayout/fp-keys.kl).
+allow fingerprintd fingerprint_device:chr_file rw_file_perms;
+
+# Crypto path: libgf_ca -> libMcClient -> /dev/mobicore-user + the mcd socket.
+# Identical to the chain live keymaster@3.0 and gatekeeper@1.0 already use
+# (see sepolicy/tee.te).
+allow fingerprintd mobicore_user_device:chr_file rw_file_perms;
+allow fingerprintd mcd:unix_stream_socket connectto;
+r_dir_file(fingerprintd, mcd_data_file)
+
+##########################
+# Template / calibration store. FACT: proprietary/lib64/libgf_hal.so contains
+# /data/gf_data/{authenticate,base/finger_base,base/nav_base,consistency,
+# enroll,navigation,test_sensor}/ as literals. goodixfpd.rc creates the root
+# 0700 system system; the daemon creates the subtree itself.
+allow fingerprintd gf_data_file:dir create_dir_perms;
+allow fingerprintd gf_data_file:file create_file_perms;
+
+##########################
+# Self-binder (the daemon hands binder objects to its own callback thread) and
+# property_service, which the daemon reaches through init's socket.
+allow fingerprintd self:binder { call transfer };
+allow fingerprintd init:unix_stream_socket connectto;
+
+##########################
+# Netlink socket to the Goodix driver — this is the finger-touch path itself.
+#
+# FACT (live device, 2026-08-10): the daemon trips
+#   avc: denied { read } scontext=u:r:fingerprintd:s0 tcontext=u:r:fingerprintd:s0
+#        tclass=netlink_socket permissive=1
+# repeatedly. It proceeds today only because SELinux is permissive.
+#
+# This is not cosmetic. gf_irq() in
+# drivers/misc/mediatek/fingerprint/goodix_tee/gf/gf_spi_tee.c does exactly one
+# thing on a sensor interrupt: push a netlink message. Every finger event —
+# touch, image-ready, and the GF_IOC_INPUT_KEY_EVENT round-trip that produces
+# mBack's KEY_BACK — reaches userspace through this socket and nothing else.
+# Under enforcing, without these rules, the daemon would start, register its
+# binder service and look healthy while never learning that a finger touched
+# the sensor: no enrolment, no authentication, and a dead mBack tap.
+#
+# Same class of latent-under-permissive defect as the LSC shading cache and the
+# akmd_set.txt calibration store: invisible now, fatal at the moment enforcing
+# is switched on, which is exactly when nobody is looking for it.
+allow fingerprintd self:netlink_socket { create bind read write setopt };
+
+##########################
+# 2026-08-14 census: the LOS @2.0 HAL service (not the goodix daemon) writes
+# the legacy fpdata store — FACT: { write } dir name="fpdata"
+# scontext=u:r:hal_fingerprint_default:s0 tcontext=fingerprintd_data_file
+# (comm fingerprint@2.0, x2). The dlopened blob keeps template metadata next
+# to where fingerprintd keeps its own; under enforcing enrolment would fail
+# at the first template write with nothing in the UI to say why.
+allow hal_fingerprint_default fingerprintd_data_file:dir rw_dir_perms;
+allow hal_fingerprint_default fingerprintd_data_file:file create_file_perms;

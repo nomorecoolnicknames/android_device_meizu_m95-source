@@ -1,0 +1,149 @@
+# m95 (Meizu MX6, MT6797) — *additional* seccomp policy for the OMX/mediacodec
+# service. This file is UNIONED with, not a replacement for, the AOSP base
+# policy the service already loads from /system/etc/seccomp_policy/mediacodec.policy.
+#
+# WHY IT EXISTS
+#
+# media.codec dies in a crash-restart loop on this port. The tombstone names the
+# mechanism outright [FACT, logcat -b crash 2026-08-09 11:09:57, pid 439/990 and
+# again 1220/1267]:
+#
+#   signal 6 (SIGABRT), code -6 (SI_TKILL), fault addr --------
+#   #00 pc 0001ce26  /system/lib/libc.so (abort+58)
+#   #01 pc 0000a335  /system/lib/libminijail.so (log_sigsys_handler+48)
+#   #02 pc 00019a68  /system/lib/libc.so
+#   #03 pc 00055c64  /system/lib/libc.so (sysinfo+8)
+#
+# log_sigsys_handler is minijail's SIGSYS handler: it runs when seccomp blocks a
+# syscall, logs it, and aborts. Frame #03 names the blocked call — sysinfo.
+#
+# [FACT] sysinfo is absent from the AOSP base policy on the device
+#   (grep -c '^sysinfo' /system/etc/seccomp_policy/mediacodec.policy -> 0)
+# [FACT] and absent from stock Flyme's own policy for this device
+#   (stock/system-extracted/etc/seccomp_policy/mediacodec-seccomp.policy),
+#   so this is a call the Pie-era service path reaches that the Marshmallow-era
+#   one did not — not something we removed.
+# [FACT] /vendor/etc/seccomp_policy/mediacodec.policy did not exist at all, so
+#   there was no additional policy to extend. This file supplies it.
+#
+# ARCHITECTURE
+#
+# [FACT] media.codec is 32-bit on this device: /proc/<pid>/maps maps
+#   /system/lib/libc.so, not /system/lib64/. Every name below is therefore from
+#   the 32-bit ARM (EABI) syscall set — mmap2, fstat64, getuid32, fcntl64,
+#   _llseek and friends. minijail silently skips names it cannot resolve, so
+#   entries are additive and can only relax, never tighten.
+#
+# PROVENANCE OF THE FIRST BLOCK
+#
+# Lines up to the "Pie-era additions" marker are stock Flyme's own mediacodec
+# policy for THIS device, copied verbatim from
+# stock/system-extracted/etc/seccomp_policy/mediacodec-seccomp.policy. It is the
+# policy MediaTek shipped for the very libMtkOmx* plugins we are running, which
+# makes it the right base rather than a guess.
+#
+# SECURITY NOTE
+#
+# Only sysinfo is evidence-driven; the rest of the second block is precautionary,
+# chosen to avoid discovering the next blocked syscall one flash cycle at a time.
+# Each is an informational, memory or synchronisation primitive. process_vm_readv
+# is deliberately NOT included even though a sibling device's policy has it: it
+# reads another process's memory, which is a real capability and is not needed to
+# decode video.
+
+# ---- stock Flyme m95 mediacodec policy, verbatim (descending call frequency) ----
+futex: 1
+ioctl: 1
+write: 1
+prctl: 1
+clock_gettime: 1
+getpriority: 1
+read: 1
+close: 1
+writev: 1
+dup: 1
+ppoll: 1
+mmap2: 1
+munmap: 1
+mprotect: 1
+madvise: 1
+openat: 1
+sigaltstack: 1
+clone: 1
+setpriority: 1
+getuid32: 1
+fstat64: 1
+pread64: 1
+faccessat: 1
+readlinkat: 1
+exit: 1
+rt_sigprocmask: 1
+set_tid_address: 1
+restart_syscall: 1
+exit_group: 1
+rt_sigreturn: 1
+pipe2: 1
+gettimeofday: 1
+sched_yield: 1
+nanosleep: 1
+lseek: 1
+sched_get_priority_max: 1
+sched_get_priority_min: 1
+statfs64: 1
+sched_setscheduler: 1
+fstatat64: 1
+ugetrlimit: 1
+# FLYME_MMF_VIDEO: opendir(/system/lib/extend)
+getdents64: 1
+chdir: 1
+
+# for bsp and tk only
+_llseek: 1
+sched_getparam: 1
+pselect6: 1
+sched_getscheduler: 1
+sched_setaffinity: 1
+sendto: 1
+recvfrom: 1
+fsync: 1
+
+# for attaching to debuggerd on process crash
+sigaction: 1
+tgkill: 1
+socket: 1
+connect: 1
+fcntl64: 1
+rt_tgsigqueueinfo: 1
+mlock: 1
+munlock: 1
+setsockopt: 1
+setrlimit: 1
+
+# ---- Pie-era additions ----
+# The one below is the measured cause of the crash loop.
+sysinfo: 1
+
+# Precautionary: standard 32-bit ARM calls a Pie mediacodec may reach that a
+# Marshmallow-era policy predates. Relaxing only.
+gettid: 1
+getpid: 1
+tkill: 1
+rt_sigtimedwait: 1
+getrandom: 1
+sched_getaffinity: 1
+mremap: 1
+msync: 1
+dup3: 1
+epoll_create1: 1
+epoll_ctl: 1
+epoll_pwait: 1
+eventfd2: 1
+timerfd_create: 1
+timerfd_settime: 1
+ftruncate64: 1
+pwrite64: 1
+fdatasync: 1
+memfd_create: 1
+prlimit64: 1
+clock_getres: 1
+getcpu: 1
