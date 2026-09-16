@@ -88,9 +88,25 @@ TARGET_KERNEL_ARCH := arm64
 TARGET_KERNEL_HEADER_ARCH := arm64
 TARGET_KERNEL_VERSION := 3.18
 BOARD_KERNEL_IMAGE_NAME := Image.gz-dtb
-# There is no kernel source here, so there must be no defconfig either;
-# kernel.mk errors out ("NO KERNEL CONFIG") if source exists without a config.
-TARGET_KERNEL_CONFIG :=
+
+# Исходник ядра всё-таки нужен, хоть мы и шьём прибилт: модуль Soong
+# generated_kernel_includes (vendor/lineage/build/soong/Android.bp:21) гонит
+# "make -C $(TARGET_KERNEL_SOURCE) headers_install", и без исходника сборка
+# падает на .dummy_dep с "kernel/meizu/m95: No such file or directory"
+# (первая полная сборка 2026-09-16, build-m95.log).
+#
+# kernel/meizu/m95 — симлинк на <original-workspace>/meizu_mx6_m95/kernel/m685,
+# Linux 3.18.22. Это ТО ЖЕ дерево, из которого собран наш прибилт (#145,
+# sha256 b84b732d…24da7e), поэтому сгенерированные заголовки соответствуют
+# ABI прошиваемого ядра — штатное предупреждение kernel.mk:186 про возможное
+# расхождение к нашему случаю не относится.
+TARGET_KERNEL_SOURCE := kernel/meizu/m95
+TARGET_KERNEL_CONFIG := lineage_m95_defconfig
+
+# Исходник есть и конфиг задан, поэтому без этого флага kernel.mk:192 полез бы
+# собирать ядро из исходников. Нам нужен именно прибилт: ветка kernel.mk:180-190
+# даёт FULL_KERNEL_BUILD := false и KERNEL_BIN := $(TARGET_PREBUILT_KERNEL).
+TARGET_FORCE_PREBUILT_KERNEL := true
 
 # Boot image geometry — FACT, parsed byte-for-byte out of the stock boot.img
 # (DEVICE_FACTS.md).  Plain ANDROID! image, header v0, no MTK 512-byte header.
