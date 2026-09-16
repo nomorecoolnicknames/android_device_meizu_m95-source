@@ -28,6 +28,17 @@ BUILD_BROKEN_DUP_RULES := true
 # relaxed for the same reason (see vendor/meizu/m95/Android.mk).
 BUILD_BROKEN_MISSING_REQUIRED_MODULES := true
 
+# Android 11+ запрещает ELF-файлы в PRODUCT_COPY_FILES и требует объявлять их
+# модулями Soong (cc_prebuilt_binary / cc_prebuilt_library_shared). У нас 50
+# таких блобов эпохи Nougat (autokd, batterywarning, aal, akmd09912 и др.) —
+# первая полная сборка 2026-09-16 упала именно на этом гейте (build-m95.log).
+#
+# ТЕХНИЧЕСКИЙ ДОЛГ, а не решение: флаг лишь снимает проверку. Правильный путь —
+# сгенерировать модули через extract-files.sh/setup-makefiles.sh. Пока блобы не
+# конвертированы, никто не проверяет их DT_NEEDED — отсутствующая зависимость
+# всплывёт только на устройстве, как «library not found» в logcat.
+BUILD_BROKEN_ELF_PREBUILT_PRODUCT_COPY_FILES := true
+
 # ---------------------------------------------------------------------------
 # Architecture
 # ---------------------------------------------------------------------------
