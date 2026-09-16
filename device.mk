@@ -11,6 +11,25 @@
 
 LOCAL_PATH := device/meizu/m95
 
+# ---------------------------------------------------------------------------
+# Soong namespaces (device-tree isolation)
+#
+# FACT (measured 2026-09-16): Soong parses every Android.bp in the workspace
+# for every product and has no TARGET_DEVICE guard, so a bp module declared in
+# one device tree lands in installs-<product>.mk of ALL products — a plain
+# `m nothing` for lineage_m5s carried 51 install-rule lines from
+# device/meizu/m95 (27 modules), two of them colliding with real m5s blobs
+# (vendor/lib{,64}/libperfservicenative.so, via the `stem:` of
+# libm95shim_perfservice).  Modules of a namespace reach Make only for the
+# products that list that namespace here
+# (build/soong/cmd/soong_build/main.go:99-112 -> android/namespace.go:204 ->
+# android/androidmk.go:918).  Each tree carries a root Android.bp with
+# `soong_namespace {}`; this line is the other half of the pair.
+# ---------------------------------------------------------------------------
+PRODUCT_SOONG_NAMESPACES += \
+    device/meizu/m95 \
+    vendor/meizu/m95
+
 # Ship the v30 VNDK apex next to the current (v33) one.  Two reasons, both
 # concrete: (a) the vendor image this port already has was built on Android 11
 # and declares ro.vndk.version=30 — with com.android.vndk.v30 present this
