@@ -423,8 +423,8 @@ set_prop(ccci_mdinit, net_radio_prop)
 #   bg-dexopt=speed-profile
 # checked on the live device before silencing this, because the WMT regression
 # in this same round was caused by a dontaudit hiding a real failure.
-dontaudit vendor_init pm_prop:property_service set;
-dontaudit vendor_init pm_prop:file { open read ioctl lock };
+dontaudit vendor_init exported_pm_prop:property_service set;
+dontaudit vendor_init exported_pm_prop:file { open read ioctl lock };
 
 # mnld resolves a path through /nvcfg to reach its GNSS calibration.
 allow mnld nvcfg_file:dir search;
