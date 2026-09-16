@@ -80,9 +80,10 @@ BOARD_VENDOR := meizu
 # nx549j/rom-nx549j-lineage-18.1-tissot/out/target/product/m95/obj/KERNEL_OBJ/
 # arch/arm64/boot/Image.gz-dtb.  It is the kernel that carries the eBPF
 # backport, the FFS-AIO backport and the dm-bufio/mnt fixes Android 13 needs.
-# kernel/meizu/m95 deliberately does not exist in this tree, so
-# vendor/lineage/build/tasks/kernel.mk takes the prebuilt branch
-# (it prints a "using prebuilt kernel" warning — expected).
+# УСТАРЕЛО (2026-09-16): раньше здесь стояло «kernel/meizu/m95 намеренно
+# отсутствует, поэтому kernel.mk берёт ветку прибилта». Это больше не так —
+# исходник пришлось подключить ради generated_kernel_includes (см. ниже),
+# а ветка прибилта теперь удерживается флагом TARGET_FORCE_PREBUILT_KERNEL.
 TARGET_PREBUILT_KERNEL := $(DEVICE_PATH)/prebuilt/Image.gz-dtb
 TARGET_KERNEL_ARCH := arm64
 TARGET_KERNEL_HEADER_ARCH := arm64
@@ -103,16 +104,23 @@ BOARD_KERNEL_IMAGE_NAME := Image.gz-dtb
 TARGET_KERNEL_SOURCE := kernel/meizu/m95
 TARGET_KERNEL_CONFIG := lineage_m95_defconfig
 
-# headers_install собирает хостовую утилиту scripts/basic/fixdep, а ядро 3.18
-# линкует хост-программы тем же $(HOSTCC) (Makefile:298 "HOSTCC = gcc";
-# scripts/Makefile.host:88 — отдельного HOSTLDFLAGS в 3.18 нет).
-# В песочнице Soong системные инструменты запрещены намеренно
-# ("System tools are no longer allowed on 10+", kernel.mk:264), GNU ld там нет,
-# и clang падает с 'Executable "ld" doesn't exist'.
-# В prebuilts AOSP есть ld.lld — направляем хостовый clang на него.
-# Одним токеном без пробелов: значение проходит через KERNEL_MAKE_FLAGS в
-# genrule-команду Soong, и кавычки на этом пути ненадёжны.
-TARGET_KERNEL_ADDITIONAL_FLAGS := HOSTCFLAGS=-fuse-ld=lld
+# НЕ ДОБАВЛЯТЬ СЮДА TARGET_KERNEL_ADDITIONAL_FLAGS ради headers_install —
+# проверено 2026-09-16, до Soong оно не доходит:
+#   * KERNEL_MAKE_FLAGS собирается в vendor/lineage/config/BoardConfigKernel.mk
+#     (строка 105 обнуляет, 108-226 наполняют) и тут же уходит в Soong через
+#     BoardConfigSoong.mk (EXPORT_TO_SOONG, снимок по `:=`);
+#   * а TARGET_KERNEL_ADDITIONAL_FLAGS читается только в
+#     vendor/lineage/build/tasks/kernel.mk:271 — это фаза make, уже ПОСЛЕ
+#     экспорта, поэтому на genrule generated_kernel_includes не влияет.
+# Проверять так: python3 -c по out/soong/soong.variables, ключ
+# VendorVars.lineageVarsPlugin.KERNEL_MAKE_FLAGS.
+#
+# Настоящая причина падения headers_install была в самом ядре: 3.18 линкует
+# однофайловые хост-программы (scripts/basic/fixdep) правилом host-csingle,
+# которое, в отличие от соседних host-cmulti/host-cxxmulti, не передавало
+# $(HOSTLDFLAGS) — поэтому переданный Lineage флаг -fuse-ld=lld до линковки не
+# доезжал, а GNU ld в песочнице отсутствует намеренно (kernel.mk:264).
+# Исправлено в дереве ядра: m685 commit 3522613e.
 
 # Исходник есть и конфиг задан, поэтому без этого флага kernel.mk:192 полез бы
 # собирать ядро из исходников. Нам нужен именно прибилт: ветка kernel.mk:180-190
