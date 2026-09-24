@@ -214,3 +214,19 @@ vendor_internal_prop(m95_audio_hal_prop)
 # `net.` and `service.` prefixes make them system_prop, which a vendor daemon
 # may neither read nor set.
 vendor_internal_prop(m95_volte_prop)
+
+# persist.camera.* -- switches of the camera provider (hal_camera_default):
+# hardware/interfaces camera/common/1.0/default/CameraModule.cpp reads
+# big_yuv (:306), reprocessing (:390), fake_raw (:490), raw_front (:496),
+# native_jpeg (:580); libm95_camera_metadata_raw, loaded into the provider by
+# the linker shim (BoardConfig.mk TARGET_LD_SHIM_LIBS), reads raw
+# (camera_metadata_raw/m95_scaler_raw.cpp:178). vendor/build.prop sets
+# big_yuv, fake_raw, raw_front and raw. A13 has no platform entry for the
+# prefix, so the names fall on default_prop: vendor_init could not set them
+# from build.prop and the provider could not read them -- RAW16 and the big
+# YUV table would switch off without an avc line (build.prop is loaded before
+# init's SELinux logging). frameworks/av has no "persist.camera." literal, so
+# cameraserver is not a reader. Restricted rather than internal so a
+# diagnostic core reader can be granted later; setting them by hand needs
+# `adb root` (su), as it did on default_prop.
+vendor_restricted_prop(m95_camera_prop)

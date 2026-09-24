@@ -17,7 +17,7 @@
 # policy (checkpolicy -b -d, compute_access_vector). Keys and the types they
 # resolve to after this change:
 #   ro.mtk_*, persist.mtk*, mtk.eccci.c2k, ro.telephony.sim.count,
-#   persist.camera.big_yuv, rild.lib{path,args},
+#   rild.lib{path,args},
 #   ro.boot.opt_* (the modem option set)             -> m95_mtk_config_prop
 #   ril.{first,external}.md, ril.telephony.mode,
 #   ril.mal.socket, persist.radio.mtk_*               -> m95_mtk_ril_prop
@@ -25,7 +25,9 @@
 #   persist.vendor.mtk.volte.enable                   -> m95_ims_vendor_prop
 #   persist.mtk.wcn.fwlog.status                      -> wmt_prop
 #   ro.vendor.vintf.legacy_kernel                     -> m95_exported_vendor_prop
+#   persist.camera.{big_yuv,fake_raw,raw_front,raw}   -> m95_camera_prop
 set_prop(vendor_init, {
+  m95_camera_prop
   m95_mtk_config_prop
   m95_mtk_ril_prop
   m95_pq_prop

@@ -103,7 +103,6 @@ persist.mtk_                    u:object_r:m95_mtk_config_prop:s0
 persist.mtk.                    u:object_r:m95_mtk_config_prop:s0
 mtk.eccci.                      u:object_r:m95_mtk_config_prop:s0
 persist.chiptest                u:object_r:m95_mtk_config_prop:s0
-persist.camera.big_yuv          u:object_r:m95_mtk_config_prop:s0
 ro.telephony.sim.count          u:object_r:m95_mtk_config_prop:s0
 rild.libpath                    u:object_r:m95_mtk_config_prop:s0
 rild.libargs                    u:object_r:m95_mtk_config_prop:s0
@@ -165,3 +164,9 @@ af.resouce.                     u:object_r:m95_audio_hal_prop:s0
 persist.af.                     u:object_r:m95_audio_hal_prop:s0
 net.ims.                        u:object_r:m95_volte_prop:s0
 service.ims.                    u:object_r:m95_volte_prop:s0
+
+# Camera provider switches (property.te m95_camera_prop): big_yuv,
+# reprocessing, fake_raw, raw_front, native_jpeg (CameraModule.cpp) and raw
+# (libm95_camera_metadata_raw). A13 has no platform entry for persist.camera.,
+# so without this they are default_prop.
+persist.camera.                 u:object_r:m95_camera_prop:s0
