@@ -464,14 +464,30 @@ PRODUCT_DEFAULT_PROPERTY_OVERRIDES += \
 # This is NOT a GSI-only workaround: the rule that sphal gets no VNDK-core is a
 # property of Android 12+ linkerconfig, so it applies to this native build too.
 # The copies here are the v30 libraries produced by the 18.1 build of this same
-# device (kept with the other blobs, outside git).  Known hazard, stated
-# plainly: a process that loads these gets a SECOND libbinder, unrelated to the
-# platform one in its default namespace.  That is the configuration in which
-# the launcher came up on 2026-09-11, so it is kept, but if binder behaviour
-# looks impossible, this is the first thing to suspect.
+# device (kept with the other blobs, outside git).
+#
+# 2026-09-24: the libbinder copies are GONE; libnetutils stays.  On the GSI the
+# vendor ran VNDK v30, and there the v30 libbinder was consistent with the rest.
+# This vendor is VNDK 33, and the copy broke every vendor process that needs
+# libbinder (meizu-fleet/designs/M95_LINK_AUDIT_20260924.md):
+#   * FACT: /vendor/lib{,64}/libbinder.so (sha256 4e76092e...) imports
+#     thread_store_get/thread_store_set (JUMP_SLOT, BIND_NOW); only the v30
+#     libcutils defines them, the v33 one does not (nm -D).
+#   * FACT: the vendor default namespace searches /vendor/${LIB} before its
+#     vndk link (linkerconfig vendordefault.cc; bionic find_library_internal),
+#     so the copy was not sphal-only.  It failed to link in 19 of 41 modelled
+#     boot processes: composer, allocator (libged), audio, camera,
+#     vndservicemanager, and the Mali closure in SurfaceFlinger/zygote.
+#   * FACT: A13-built vendor code needs libbinder symbols v30 lacks (5 for
+#     libgui_vendor, 5 for vndservicemanager).
+# Without the copy, vendor processes take libbinder from the VNDK v33 apex:
+# clean in the model, N blobs included.  The sphal half moves to the platform:
+# system/linkerconfig branch meizu-legacy-vendor (f132f5b,
+# meizu-fleet/patches/system_linkerconfig/) adds libbinder.so to the
+# sphal -> vndk link.  WITHOUT that patch, SurfaceFlinger still cannot load
+# EGL ("libbinder.so" not found in sphal), exactly as on the GSI.
+# libnetutils (v30) links cleanly against VNDK 33 in the same model.
 PRODUCT_COPY_FILES += \
-    vendor/meizu/m95/proprietary/vendor/lib64/libbinder.so:$(TARGET_COPY_OUT_VENDOR)/lib64/libbinder.so \
-    vendor/meizu/m95/proprietary/vendor/lib/libbinder.so:$(TARGET_COPY_OUT_VENDOR)/lib/libbinder.so \
     vendor/meizu/m95/proprietary/vendor/lib64/libnetutils.so:$(TARGET_COPY_OUT_VENDOR)/lib64/libnetutils.so \
     vendor/meizu/m95/proprietary/vendor/lib/libnetutils.so:$(TARGET_COPY_OUT_VENDOR)/lib/libnetutils.so
 # ---------------------------------------------------------------------------

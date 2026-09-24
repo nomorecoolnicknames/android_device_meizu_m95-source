@@ -277,7 +277,9 @@ BOARD_VNDK_VERSION := current
 # a KATI_obsolete_var in Android 13 (build/make/core/config.mk:156) — VNDK-lite
 # no longer exists.  Anything that relied on a vendor process seeing
 # /system/lib must now be solved with a vendor-side copy of the library, the
-# way libbinder/libnetutils are in device.mk.
+# way libnetutils is in device.mk.  NOT for a VNDK library the vendor namespace
+# also uses: a /vendor copy shadows the VNDK apex one in EVERY vendor process
+# (libbinder, device.mk, 2026-09-24).
 
 # HIDL/VINTF device manifest
 DEVICE_MANIFEST_FILE := $(DEVICE_PATH)/manifest.xml
