@@ -79,6 +79,14 @@ PRODUCT_PACKAGES += \
     libgui_m95 \
     libsensor_m95
 
+# Vendor libcamera_client (frameworks/av/camera, branch meizu-legacy-vendor):
+# 21 camera HAL1 blobs NEED libcamera_client.so, which A13 builds only for
+# /system, so the camera provider failed to link and there were 0 cameras
+# ("library \"libcamera_client.so\" not found: needed by
+# /vendor/lib/libmtkcam_fwkutils.so", 2026-09-24).
+PRODUCT_PACKAGES += \
+    libcamera_client_vendor
+
 # ---------------------------------------------------------------------------
 # Vendor shims (shims/Android.bp).  Per-symbol evidence in the 18.1 documents
 # VENDOR_A11_BLOB_AUDIT.md and los/device/meizu/m95/BLOB_SHIMS.md.
