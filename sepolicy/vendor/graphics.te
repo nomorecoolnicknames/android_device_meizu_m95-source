@@ -50,7 +50,10 @@ allow system_server proc_ged:file r_file_perms;
 # prefixes in strings of hwcomposer.mt6797.so are debug.hwc.* and
 # debug.sf.sw_vsync_fps, both u:object_r:debug_prop:s0 in the Pie base
 # property_contexts). set_prop expands to both halves of the denial.
-set_prop(hal_graphics_composer_default, debug_prop)
+# 2026-09-24 (A13): a vendor domain may read debug_prop but not set it
+# (compatible_property_only "Prevent properties from being set"). debug.hwc.*
+# is relabelled m95_hwc_debug_prop (property_contexts) and granted in
+# mtk_props.te; debug.sf.* is only read here.
 
 # MTK GuiExt: the composer registers GuiExtService on vndbinder (FACT:
 # { add } on what fell through to default_android_vndservice, 2026-08-14;

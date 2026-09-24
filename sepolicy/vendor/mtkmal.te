@@ -79,7 +79,11 @@ allow mtkmal vendor_file:file { read open getattr execute map };
 # strings of /vendor/bin/mtkmal; every other property string there pairs with
 # a property_get log line. "ril." is radio_prop (plat_property_contexts:14),
 # the same grant gsm0710muxd already holds (modem_daemons.te:62).
-set_prop(mtkmal, radio_prop)
+#
+# 2026-09-24 (A13): the grant is gone -- radio_prop may be read or set only by
+# hal_telephony_server among vendor domains (compatible_property_only). Both
+# names, plus ril.emulation.userload and ril.mux.report.case, are
+# m95_mtk_ril_prop now; the set is in mtk_props.te.
 
 # PREDICTED NEXT CENSUS — deliberately NOT granted (this file adds rights on
 # observed denials only). Once the entities load, libmal_rilproxy should

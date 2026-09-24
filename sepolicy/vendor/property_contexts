@@ -91,3 +91,64 @@ persist.vendor.radio.           u:object_r:m95_ims_vendor_prop:s0
 persist.vendor.ss.              u:object_r:m95_ims_vendor_prop:s0
 persist.vendor.suppserv.        u:object_r:m95_ims_vendor_prop:s0
 persist.vendor.log.             u:object_r:m95_ims_vendor_prop:s0
+
+# 2026-09-24, SELinux lane (property.te, bottom block). Android 13 names that
+# fall on platform types a vendor domain may not read or set. Only names that
+# are actually set somewhere are listed (vendor/build.prop, rc, a daemon).
+
+# MTK feature switches (vendor/build.prop). ro.mtk_pq and persist.mtk.wcn.
+# above are longer and keep their own types.
+ro.mtk_                         u:object_r:m95_mtk_config_prop:s0
+persist.mtk_                    u:object_r:m95_mtk_config_prop:s0
+persist.mtk.                    u:object_r:m95_mtk_config_prop:s0
+mtk.eccci.                      u:object_r:m95_mtk_config_prop:s0
+persist.chiptest                u:object_r:m95_mtk_config_prop:s0
+persist.camera.big_yuv          u:object_r:m95_mtk_config_prop:s0
+ro.telephony.sim.count          u:object_r:m95_mtk_config_prop:s0
+rild.libpath                    u:object_r:m95_mtk_config_prop:s0
+rild.libargs                    u:object_r:m95_mtk_config_prop:s0
+# Modem option set (opt_md1_support=12, opt_md3_support=2, ...). LK does not
+# pass them on the cmdline (FACT, 192234 dmesg: only hardware, selinux,
+# serialno, bootreason, verifiedbootstate), so vendor/build.prop is their only
+# source, and vendor_init may not set the plat bootloader_prop behind `ro.boot.`.
+# Readers: ccci_mdinit, gsm0710muxd, libcustom_nvram (strings).
+ro.boot.opt_                    u:object_r:m95_mtk_config_prop:s0
+
+# MTK RIL/MAL/MUX state; the plat `ril.` and `persist.radio` prefixes are
+# radio_prop, readable by rild alone among vendor domains.
+ril.first.md                    u:object_r:m95_mtk_ril_prop:s0
+ril.external.md                 u:object_r:m95_mtk_ril_prop:s0
+ril.telephony.mode              u:object_r:m95_mtk_ril_prop:s0
+ril.mal                         u:object_r:m95_mtk_ril_prop:s0
+ril.volte.mal.                  u:object_r:m95_mtk_ril_prop:s0
+ril.mux                         u:object_r:m95_mtk_ril_prop:s0
+ril.getccci.response            u:object_r:m95_mtk_ril_prop:s0
+ril.pid.                        u:object_r:m95_mtk_ril_prop:s0
+ril.phone1.mapped.md            u:object_r:m95_mtk_ril_prop:s0
+ril.phone2.mapped.md            u:object_r:m95_mtk_ril_prop:s0
+ril.emulation.userload          u:object_r:m95_mtk_ril_prop:s0
+ril.epdg.                       u:object_r:m95_mtk_ril_prop:s0
+ril.data.mal                    u:object_r:m95_mtk_ril_prop:s0
+ril.rilproxy                    u:object_r:m95_mtk_ril_prop:s0
+persist.radio.mtk_              u:object_r:m95_mtk_ril_prop:s0
+persist.radio.mnl.prop          u:object_r:m95_mtk_ril_prop:s0
+
+# Modem status that ccci_mdinit publishes on the plat `net.cdma` prefix
+# (net_radio_prop, core-only).
+net.cdma.mdmstat                u:object_r:mtk_md_prop:s0
+
+# init.svc.* of vendor services polled by vendor code.
+init.svc.ril-proxy              u:object_r:m95_vendor_svc_prop:s0
+init.svc.goodixfpd              u:object_r:m95_vendor_svc_prop:s0
+
+# USB VID, set and expanded only in init.mt6797.usb.rc.
+sys.usb.vid                     u:object_r:m95_usb_prop:s0
+
+# hwcomposer tuneables.
+debug.hwc.                      u:object_r:m95_hwc_debug_prop:s0
+
+# PQ daemon on/off switch (init.mt6797.rc trigger).
+persist.m95.pq.enable           u:object_r:m95_pq_prop:s0
+
+# Vendor setting read by system_server (android_os_VintfObject.cpp:106).
+ro.vendor.vintf.legacy_kernel   u:object_r:m95_exported_vendor_prop:s0

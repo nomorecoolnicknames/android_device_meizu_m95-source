@@ -47,7 +47,18 @@ allow m95_bdaddr vendor_toolbox_exec:file { read open getattr execute execute_no
 allow m95_bdaddr vendor_file:dir { search read open getattr };
 allow m95_bdaddr nvdata_file:dir search;
 allow m95_bdaddr nvdata_file:file { read open getattr };
-set_prop(m95_bdaddr, bluetooth_prop)
+# 2026-09-24 (A13): set_prop(m95_bdaddr, bluetooth_prop) removed. It violates
+# the compatible_property_only neverallow (private/property.te: bluetooth_prop
+# is set/read only by core, bluetooth and hal_bluetooth_server), and on A13 it
+# has no consumer: persist.service.bdroid.bdaddr occurs in
+# packages/modules/Bluetooth only in system/doc/properties.md, and in neither
+# libbluetooth_mtk.so nor libbt-vendor.so. The address reaches the stack from
+# the controller, which libbluetooth_mtk programs from the same NVRAM file.
+# Under enforcing the script's getprop/setprop are denied (two avc lines per
+# boot, expected) and it exits 0.
+# FALSIFIER: under enforcing, `dumpsys bluetooth_manager | grep address` must
+# equal the bytes of /data/nvram/APCFG/APRDEB/BT_Addr. If it does not, the fix
+# is a vendor BT-HAL path, not this grant.
 
 ##############################################################################
 # m95_fatal_capture — bring-up helper: pins CPUs and captures state into
