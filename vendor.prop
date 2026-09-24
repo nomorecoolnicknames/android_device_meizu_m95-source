@@ -129,3 +129,9 @@ ro.vendor.audio.legacy_nougat_abi=1
 # A13 GSI (Flyme 13) поверх нашего vendor: Mali r12p0 (Nougat) роняет каждое задание Skia-GL
 # (mali: Unhandled Page fault, ~100 за 8 с, кадр чёрный); legacy GLES RenderEngine — 0 фолтов (2026-09-11)
 debug.renderengine.backend=gles
+
+# EGL/GLES identity (M95_PERF_AUDIT P1-6). Stock value (stock /system/build.prop:87);
+# unset, PackageManagerService publishes GL_ES_VERSION_UNDEFINED.
+ro.opengles.version=196610
+# libEGL loads libGLES_mali.so by suffix (Loader.cpp) instead of directory scans.
+ro.hardware.egl=mali
