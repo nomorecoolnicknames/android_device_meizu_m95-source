@@ -30,3 +30,12 @@ on property:sys.boot_completed=1
     write /sys/devices/system/cpu/cpufreq/interactive/timer_rate 10000
     write /sys/devices/system/cpu/cpufreq/interactive/min_sample_time 40000
     write /sys/devices/system/cpu/cpufreq/interactive/hispeed_freq 1391000
+
+# CPU weight of the background and dex2oat groups (2026-09-24, meizu-fleet/designs/
+# M95_PERF_AUDIT_20260924.md P1-1).  A13 init.rc creates /dev/cpuctl/{background,dex2oat}
+# but never writes cpu.shares, and 3.18 has neither uclamp nor schedtune, so each group
+# weighed as much as top-app: a cached app syncing or dex2oat competed with the UI at
+# equal CFS weight on every core.  Stock Flyme gave background 52 (stock init.rc:152).
+on boot
+    write /dev/cpuctl/background/cpu.shares 52
+    write /dev/cpuctl/dex2oat/cpu.shares 128
