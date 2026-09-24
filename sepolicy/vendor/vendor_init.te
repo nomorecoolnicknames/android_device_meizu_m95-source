@@ -68,3 +68,79 @@ get_prop(vendor_init, {
   m95_forge_prop
   m95_vendor_svc_prop
 })
+
+##############################################################################
+# Files
+##############################################################################
+# MTK's fixed /data paths, created by our rc files at post-fs-data. They carry
+# core_data_file_type (A13 sepolicy_tests require it for every type on /data
+# outside /data/vendor*), and public/vendor_init.te grants vendor_init dir
+# creation on file_type MINUS core_data_file_type -- so every mkdir below is
+# refused under enforcing, and the daemon behind it starts without its store.
+# vendor_init is in data_between_core_and_vendor_violators (violators.te),
+# which lifts the matching neverallow (public/domain.te:865-876).
+# FACT (both captures, scontext=vendor_init, tclass=dir):
+#   /data/md3 ccci_data_file, /data/gf_data gf_data_file, /data/gps_mnl
+#   mnld_data_file, /data/misc/sensor mtk_sensor_data_file, /data/.tp
+#   thermal_data_file { create getattr setattr }; /data/ipsec
+#   epdg_wod_data_file { create add_name write getattr };
+#   /data/misc/mcRegistry mcd_data_file { create add_name write open read
+#   search getattr setattr }; /data/nvram + /nvdata nvdata_file { create
+#   add_name write getattr setattr }; 113630 (fresh /data): the parents,
+#   system_data_file { add_name create write open read } for misc, sensor,
+#   ccci_cfg.
+allow vendor_init {
+  ccci_data_file
+  ccci_cfg_file
+  epdg_wod_data_file
+  gf_data_file
+  mcd_data_file
+  mnld_data_file
+  mtk_sensor_data_file
+  nvdata_file
+  thermal_data_file
+}:dir { create search getattr open read setattr write add_name relabelfrom relabelto };
+allow vendor_init { system_data_root_file system_data_file }:dir { write add_name };
+
+# init.mt6797.rc: `copy /vendor/etc/fstab.mt6797 /data/nvram/fstab.mt6797`
+# and chmod -- libnvram parses it to find the raw nvram partition; without it
+# service.nvram_init never turns Ready (see the rc comment). FACT (192234):
+# denied { open write setattr } name=fstab.mt6797 tcontext=nvdata_file.
+allow vendor_init nvdata_file:file { create getattr open read write setattr };
+
+# restorecon_recursive of /data/md3, /data/ccci_cfg, /data/misc/mcRegistry.
+allow vendor_init { ccci_data_file ccci_cfg_file mcd_data_file }:file { getattr relabelfrom relabelto };
+
+# init.mt6797.rc:80 `restorecon_recursive /dev/block/platform/mtk-msdc.0`
+# relabels the by-name symlinks from block_device to the per-partition types.
+# vendor_init's relabelto covers file_type only, not dev_type. FACT (both
+# captures): relabelfrom on block_device:lnk_file and relabelto on the
+# eighteen types below. Symlink labels do not gate access
+# (public/domain.te:67 lets every domain follow dev_type links); granted to
+# keep the rc line from failing, not for a functional reason.
+allow vendor_init block_device:lnk_file relabelfrom;
+allow vendor_init {
+  boot_block_device
+  cache_block_device
+  expdb_block_device
+  frp_block_device
+  lk_block_device
+  logo_block_device
+  mdimg_block_device
+  misc_block_device
+  nvcfg_device
+  nvdata_device
+  nvram_device
+  proinfo_block_device
+  protect_f_device
+  protect_s_device
+  recovery_block_device
+  seccfg_block_device
+  system_block_device
+  userdata_block_device
+}:lnk_file relabelto;
+
+# init.m95.mem.rc: swappiness 100 for zram and the GED GPU-frequency floor.
+# Types in file.te / genfs_contexts.
+allow vendor_init m95_proc_swappiness:file w_file_perms;
+allow vendor_init m95_debugfs_ged_boost:file w_file_perms;
