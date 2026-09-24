@@ -6,3 +6,10 @@ persist.sys.strictmode.disable=true
 # Force framework VoLTE-available gate for bring-up (phh/GSI override;
 # forces OUR side only, not the network — FACT, LOS16 tree).
 persist.dbg.volte_avail_ovr=1
+
+# SurfaceFlinger keeps a continuous transaction trace on non-user builds
+# (SurfaceFlinger.cpp:450-451); this product is userdebug (M95_PERF_AUDIT P1-3).
+debug.sf.enable_transaction_tracing=false
+# Legacy GLES RenderEngine: Skia-GL faults Mali r12p1 (FLYME13_KERNEL_PLAN.md:415-419).
+# System-side copy of vendor.prop:131 / init.mt6797.rc:59.
+debug.renderengine.backend=gles
