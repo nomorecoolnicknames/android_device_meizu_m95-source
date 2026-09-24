@@ -65,9 +65,8 @@ on post-fs-data
     # (net_bt_stack) no longer exists in Pie, and the BT HAL process
     # (user bluetooth, no supplementary groups) reads it through libnvram
     # [DEV: /nvdata/APCFG/APRDEB/BT_Addr on device; libbluetooth_mtk.so
-    # NEEDED libnvram.so]. Regroup it so the HAL can read its BD address.
-    chown root bluetooth /data/nvram/APCFG/APRDEB/BT_Addr
-    chmod 0660 /data/nvram/APCFG/APRDEB/BT_Addr
+    # NEEDED libnvram.so]. Regroup it so the HAL can read its BD address --
+    # on `service.nvram_init=Ready` below, once nvram_daemon has restored it.
 
 ##############################
 # WMT: wmt_loader probes the combo chip via /dev/wmtdetect and exits;
@@ -141,7 +140,14 @@ service m95_bdaddr /vendor/bin/sh /vendor/bin/m95-bdaddr.sh
     oneshot
     disabled
 
-on property:vold.post_fs_data_done=1
+# nvram_daemon (class main) restores the NVRAM records into /data/nvram only
+# after post-fs-data; on a freshly wiped /data BT_Addr does not exist before
+# that. So the regroup and the address publisher wait for NVRAM's own Ready
+# flag (2026-09-24: m95_bdaddr ran at 20.5 s, before NVRAM, exited on the
+# missing file, and the BT HAL aborted with "Open: No Bluetooth Address!").
+on property:service.nvram_init=Ready
+    chown root bluetooth /data/nvram/APCFG/APRDEB/BT_Addr
+    chmod 0660 /data/nvram/APCFG/APRDEB/BT_Addr
     start m95_bdaddr
 
 ##############################
