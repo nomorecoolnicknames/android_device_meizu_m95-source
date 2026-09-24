@@ -92,6 +92,28 @@ thermal_once() {
     echo "10 110000 0 mtktscpu-sysrst 85000 0 cpu_adaptive_0 80000 0 cpu_adaptive_1 65000 0 no-cooler 63000 0 no-cooler 60000 0 no-cooler 55000 0 no-cooler 50000 0 no-cooler 45000 0 no-cooler 40000 0 no-cooler 40" > "$TZCPU" 2>/dev/null || true
 }
 
+# PER-SET MASKS (Android 13 port, M95_PREFLASH_PERF.md §4). Until now every
+# set got the full present mask, background included. On this kernel that
+# leaves background apps nothing that ranks them below the UI: no uclamp and
+# no schedtune (neither is in the 3.18 .config), and A13 init.rc creates
+# /dev/cpuctl/background without touching cpu.shares (init.rc:131-178), so a
+# cached app syncing or unpacking competes with the top app on every core,
+# the A72 pair included, at equal CFS weight. A13 itself says the device must
+# set the masks (init.rc:333-335: "the device's init.rc must actually set the
+# correct cpus"). The cpuset is the one isolation mechanism left here.
+#
+#   background, restricted  -> 0-3, the A53 LITTLE cluster (cpu_capacity 304;
+#       4-7 are 415, 8-9 the A72 at 1024, FACT dmesg-first-b13.txt). Only
+#       ActivityManager puts processes there (OomAdjuster: SCHED_GROUP_
+#       BACKGROUND / _RESTRICTED); no platform or vendor rc does.
+#   everything else -> the present mask, as before. system-background must
+#       stay wide: A13 SurfaceFlinger moves its own threads, main thread
+#       included, into system-background (main_surfaceflinger.cpp:145,
+#       SFMainPolicy / SFRenderEnginePolicy in task_profiles.json), and with
+#       debug.renderengine.backend=gles every GPU composition runs on that
+#       main thread -- narrowing it would push composition onto LITTLE cores.
+LITTLE=0-3
+
 sync_once() {
     # Prefer the present set (durable with the cpus_requested backport: the
     # kernel intersects it with the active mask itself). If the write is
@@ -104,7 +126,11 @@ sync_once() {
     for set in foreground background top-app system-background restricted \
                foreground/boost camera-daemon; do
         [ -d "/dev/cpuset/$set" ] || continue
-        if [ -n "$present" ] && echo "$present" > "/dev/cpuset/$set/cpus" 2>/dev/null; then
+        case "$set" in
+            background|restricted) want=$LITTLE ;;
+            *) want=$present ;;
+        esac
+        if [ -n "$want" ] && echo "$want" > "/dev/cpuset/$set/cpus" 2>/dev/null; then
             continue
         fi
         [ -n "$online" ] && echo "$online" > "/dev/cpuset/$set/cpus" 2>/dev/null || true
