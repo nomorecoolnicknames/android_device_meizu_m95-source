@@ -241,9 +241,14 @@
          the failed lookup in mDisabledRadioServices and never retries. On
          LOS16 (shipping API 28) the enforcement was off, which is why the
          16.0 tree has no radio entry here.
-         Versions: our libril registers IRadio/ISap at @1.1 and IOemHook at
-         @1.0 (ril_service.cpp / sap_service.cpp registerService). slot2 is
-         declared because SIM_COUNT=2 makes registerService loop over both. -->
+         Versions: our libril registers IRadio/ISap at @1.1 (ril_service.cpp /
+         sap_service.cpp registerService). slot2 is declared because
+         SIM_COUNT=2 makes registerService loop over both.
+         lineage-20: no IOemHook entry any more. The lineage-20 libril dropped
+         the OemHook service (hardware/ril ff9403f: no IOemHook in
+         ril_service.cpp, no radio.deprecated@1.0 in libril/Android.mk), the
+         MTK port on meizu-legacy-vendor keeps it dropped, and Android 13's
+         telephony framework has no IOemHook client. -->
     <hal format="hidl">
         <name>android.hardware.radio</name>
         <transport>hwbinder</transport>
@@ -255,16 +260,6 @@
         </interface>
         <interface>
             <name>ISap</name>
-            <instance>slot1</instance>
-            <instance>slot2</instance>
-        </interface>
-    </hal>
-    <hal format="hidl">
-        <name>android.hardware.radio.deprecated</name>
-        <transport>hwbinder</transport>
-        <version>1.0</version>
-        <interface>
-            <name>IOemHook</name>
             <instance>slot1</instance>
             <instance>slot2</instance>
         </interface>
