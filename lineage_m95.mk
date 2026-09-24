@@ -20,6 +20,26 @@ $(call inherit-product, vendor/lineage/config/common_full_phone.mk)
 # Inherit from m95 device
 $(call inherit-product, device/meizu/m95/device.mk)
 
+# VoLTE Java half: ForgeImsService (package com.mediatek.ims), the MediaTek
+# alps-P ImsService port that registered IMS on 16.0 and 18.1, ported to API 33
+# (repo meizu-fleet/wt/forge_ims, branch lineage-20).  forge-ims.mk only does
+# PRODUCT_PACKAGES += ForgeImsService.  ImsResolver finds the package through
+# config_ims_mmtel_package (overlay/packages/services/Telephony) and only
+# exists because android.hardware.telephony.ims.xml is copied in device.mk.
+#
+# vendor/forge/ims must be a REAL directory.  soong's finder skips symlinked
+# directories (build/soong/finder/finder.go:1418), so behind a symlink its
+# Android.mk is never read, and with BUILD_BROKEN_MISSING_REQUIRED_MODULES :=
+# true (BoardConfig.mk) PRODUCT_PACKAGES drops ForgeImsService without a
+# word: the image would boot with no ImsService and nothing in the build log.
+ifeq ($(wildcard vendor/forge/ims/forge-ims.mk),)
+  $(error m95: vendor/forge/ims is missing; clone meizu-fleet/wt/forge_ims (branch lineage-20) there)
+endif
+ifneq ($(shell readlink -f vendor/forge/ims),$(shell readlink -f .)/vendor/forge/ims)
+  $(error m95: vendor/forge/ims is or sits under a symlink; soong's finder skips symlinked directories, so ForgeImsService would silently vanish. Use a real clone)
+endif
+$(call inherit-product, vendor/forge/ims/forge-ims.mk)
+
 # Framework / lineage-sdk resource overlays.
 DEVICE_PACKAGE_OVERLAYS += device/meizu/m95/overlay
 

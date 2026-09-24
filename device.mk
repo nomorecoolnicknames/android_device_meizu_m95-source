@@ -366,6 +366,17 @@ PRODUCT_COPY_FILES += \
     frameworks/native/data/etc/android.hardware.wifi.direct.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.wifi.direct.xml \
     frameworks/native/data/etc/android.hardware.consumerir.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.consumerir.xml
 
+# Privileged-permission allowlist for ForgeImsService (com.mediatek.ims,
+# /system/priv-app, pulled in by vendor/forge/ims/forge-ims.mk from
+# lineage_m95.mk).  Not optional: lineage-20 sets
+# ro.control_privapp_permissions=enforce (vendor/lineage/config/common.mk:84),
+# and on 18.1 the missing file made system_server throw "Signature|privileged
+# permissions not in privapp-permissions whitelist: {com.mediatek.ims ...
+# READ_PRECISE_PHONE_STATE}" and restart every ~19 s -- the phone never
+# finished booting (FACT 2026-09-07).  It goes to /system, next to the APK.
+PRODUCT_COPY_FILES += \
+    $(LOCAL_PATH)/permissions/privapp-permissions-com.mediatek.ims.xml:$(TARGET_COPY_OUT_SYSTEM)/etc/permissions/privapp-permissions-com.mediatek.ims.xml
+
 # ---------------------------------------------------------------------------
 # Media configs.  Their absence was measured live on 18.1 (2026-09-07) and is a
 # SINGLE packaging defect with four unrelated-looking symptoms: empty codec list
@@ -450,10 +461,9 @@ PRODUCT_DEFAULT_PROPERTY_OVERRIDES += \
 # DELIBERATELY NOT CARRIED OVER FROM 18.1 — do not "restore" without reading
 # M95_LOS20_TREE.md first:
 #
-#  * vendor/forge/ims (ForgeImsService, the ported MediaTek ImsService) and its
-#    privapp-permissions file.  The port is patched against API 30 sources; it
-#    has not been rebuilt against API 33 and would not compile.  VoLTE is out of
-#    scope for the first Android 13 boot.
+#  * (vendor/forge/ims -- ForgeImsService -- used to be listed here.  It is
+#    carried over again, ported to API 33 in the forge_ims repo, branch
+#    lineage-20: see lineage_m95.mk and the privapp-permissions block below.)
 #
 #  * (librilmtk used to be listed here.  It is carried over again: see the
 #    PRODUCT_PACKAGES block next to librilimp and hardware/ril branch
