@@ -405,6 +405,32 @@
 /(vendor|system/vendor)/lib(64)?/libm95shim_utils\.so   u:object_r:same_process_hal_file:s0
 /(vendor|system/vendor)/lib(64)?/libm95probe\.so        u:object_r:same_process_hal_file:s0
 
+# 2026-09-24 (Android 13, SELinux lane): the closure above was one link short.
+# libgpu_aux.so now pulls libdpframework.so, and through it the MDP/PQ/codec
+# helpers below. FACT (capture m95-boot-20260924-192234, dmesg): zygote,
+# surfaceflinger and bootanim take { execute } / { open read getattr } on
+# vendor_file for /vendor/lib{,64}/libdpframework.so, libbwc.so, libm4u.so,
+# libpq_prot.so and /vendor/lib/libstdc++.so. The kernel audits a
+# (domain, vendor_file, file, perm) tuple once per boot, so the log names only
+# the first library per permission; the full set is the readelf DT_NEEDED
+# closure of egl/libGLES_mali.so + hw/gralloc.mt6797.so on the built /vendor
+# (64- and 32-bit). Under enforcing any one of them missing means no EGL in
+# zygote, surfaceflinger or bootanim.
+/(vendor|system/vendor)/lib(64)?/libdpframework\.so      u:object_r:same_process_hal_file:s0
+/(vendor|system/vendor)/lib(64)?/libbwc\.so              u:object_r:same_process_hal_file:s0
+/(vendor|system/vendor)/lib(64)?/libm4u\.so              u:object_r:same_process_hal_file:s0
+/(vendor|system/vendor)/lib(64)?/libmtk_drvb\.so         u:object_r:same_process_hal_file:s0
+/(vendor|system/vendor)/lib(64)?/libpq_prot\.so          u:object_r:same_process_hal_file:s0
+/(vendor|system/vendor)/lib(64)?/libpqservice\.so        u:object_r:same_process_hal_file:s0
+/(vendor|system/vendor)/lib(64)?/libvcodec_utility\.so   u:object_r:same_process_hal_file:s0
+/(vendor|system/vendor)/lib(64)?/libvcodecdrv\.so        u:object_r:same_process_hal_file:s0
+/(vendor|system/vendor)/lib(64)?/libvcodec_oal\.so       u:object_r:same_process_hal_file:s0
+/(vendor|system/vendor)/lib(64)?/libmp4enc_sa\.ca7\.so   u:object_r:same_process_hal_file:s0
+/(vendor|system/vendor)/lib(64)?/libvc1dec_sa\.ca7\.so   u:object_r:same_process_hal_file:s0
+/(vendor|system/vendor)/lib(64)?/libvp8dec_sa\.ca7\.so   u:object_r:same_process_hal_file:s0
+/(vendor|system/vendor)/lib(64)?/libstdc\+\+\.so          u:object_r:same_process_hal_file:s0
+/(vendor|system/vendor)/lib(64)?/libnetutils\.so         u:object_r:same_process_hal_file:s0
+
 # A13 GSI (FACT 2026-09-11): the AOSP regex covers only ...-service, not the
 # .software variant this device installs; unlabeled -> init refuses to start it
 # -> LockSettingsService NPE on IGateKeeper.
