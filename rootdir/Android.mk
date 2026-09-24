@@ -169,17 +169,3 @@ LOCAL_MODULE_CLASS := ETC
 LOCAL_SRC_FILES    := m95-fatal-capture.sh
 LOCAL_MODULE_PATH  := $(TARGET_OUT_VENDOR_EXECUTABLES)
 include $(BUILD_PREBUILT)
-
-# Replaces the camera provider's service definition (`override`) to preload
-# libm95_camera_metadata_raw. It sits in /vendor/etc/init itself, which init
-# parses in sorted order, so it lands after
-# android.hardware.camera.provider@2.4-service.rc and replaces it cleanly. From
-# init/hw it would be imported first and win only because init rejects the
-# provider's own definition as a duplicate -- with an error line on every boot.
-include $(CLEAR_VARS)
-LOCAL_MODULE       := init.m95.camera-provider.rc
-LOCAL_MODULE_TAGS  := optional
-LOCAL_MODULE_CLASS := ETC
-LOCAL_SRC_FILES    := init.m95.camera-provider.rc
-LOCAL_MODULE_PATH  := $(TARGET_OUT_VENDOR_ETC)/init
-include $(BUILD_PREBUILT)

@@ -15,8 +15,7 @@
  * tree's clang-r450784d -- and the blob would read its pimpl from our stack.
  *
  * Every class here is only ever reached through a pointer the vendor handed
- * over, so only the vtable slot order has to match, plus the size of IEntry
- * where this file builds one in raw storage. The order is the blob's own,
+ * over, so only the vtable slot order has to match. The order is the blob's own,
  * decoded from _ZTVN5NSCam9IMetadataE (15 slots) and
  * _ZTVN5NSCam9IMetadata6IEntryE (43 slots) through their R_ARM_ABS32
  * relocations. Slots this library never calls are placeholders with names that
@@ -24,11 +23,13 @@
  *
  * Nothing here is defined, and nothing is called by symbol. The destructors in
  * slots 0 and 1 are declared as ordinary virtuals on purpose: with a real
- * ~IEntry() in this header the compiler would emit a direct call to
+ * ~IEntry() in this header the compiler could emit a direct call to
  * _ZN5NSCam9IMetadata6IEntryD1Ev, an undefined symbol that bionic must bind
- * when LD_PRELOAD maps this library -- before libmtkcam_metadata exists in the
- * process -- and the preload would be dropped. The one construction this
- * library does goes through dlsym (m95_scaler_raw.cpp, ScopedEntry).
+ * when it links this library as a shim of the provider executable -- before
+ * libmtkcam_metadata exists in the process. A shim that cannot be linked is not
+ * skipped: the provider does not start, and the device has no cameras. This
+ * library never constructs or destroys an entry; it only edits the ones the
+ * vendor built.
  *
  * 32-bit only: the camera provider on this device is the 32-bit
  * android.hardware.camera.provider@2.4-service (compile_multilib "32").
@@ -85,6 +86,7 @@ public:
     private:
         // FACT: the blob's constructor stores the vtable at +0 and a new'd
         // Implementor at +4 (IEntryC1Ej at 0x8ad8), so an entry is 8 bytes.
+        // Kept so the declared layout is the real one; nothing here allocates.
         void* mImplementor;
     };
 
@@ -107,23 +109,16 @@ private:
 }  // namespace NSCam
 
 // MediaTek's scaler tags mirror Android's: section 13, the same offsets.
-// FACT for 0xd000a (checkStream loads it with movs/movt, libcam3_app 0x11760),
-// and for the six tags below as a group (stream-table.md, the dump of the
-// vendor section taken before any change, d0003/d0004/d000a/b/c/d). Values as
-// in system/media/camera/include/system/camera_metadata_tags.h:313-327.
+// FACT for 0xd000a (checkStream loads it with movs/movt, libcam3_app 0x11760)
+// and for all three here (built with movw/movt in the blob's IMX386_SUNNY scaler
+// function, metastore 0x1a808). Values as in
+// system/media/camera/include/system/camera_metadata_tags.h:324-326.
 enum : NSCam::MUINT32 {
-    MTK_SCALER_AVAILABLE_JPEG_SIZES = 0x000d0003,
-    MTK_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM = 0x000d0004,
     MTK_SCALER_AVAILABLE_STREAM_CONFIGURATIONS = 0x000d000a,
     MTK_SCALER_AVAILABLE_MIN_FRAME_DURATIONS = 0x000d000b,
     MTK_SCALER_AVAILABLE_STALL_DURATIONS = 0x000d000c,
-    MTK_SCALER_CROPPING_TYPE = 0x000d000d,
 };
 
 enum : NSCam::MINT32 {
     MTK_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT = 0,
-};
-
-enum : NSCam::MUINT8 {
-    MTK_SCALER_CROPPING_TYPE_FREEFORM = 1,
 };
