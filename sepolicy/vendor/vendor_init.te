@@ -108,8 +108,11 @@ allow vendor_init { system_data_root_file system_data_file }:dir { write add_nam
 # denied { open write setattr } name=fstab.mt6797 tcontext=nvdata_file.
 allow vendor_init nvdata_file:file { create getattr open read write setattr };
 
-# restorecon_recursive of /data/md3, /data/ccci_cfg, /data/misc/mcRegistry.
-allow vendor_init { ccci_data_file ccci_cfg_file mcd_data_file }:file { getattr relabelfrom relabelto };
+# restorecon_recursive of /data/md3, /data/ccci_cfg, /data/misc/mcRegistry,
+# and `restorecon /data/iNemoEngine_gbias.dat` (init.mt6797.rc:120). FACT
+# (b16, m95-b16-noims-20260924): denied { getattr }
+# path=/data/iNemoEngine_gbias.dat tcontext=mtk_sensor_data_file.
+allow vendor_init { ccci_data_file ccci_cfg_file mcd_data_file mtk_sensor_data_file }:file { getattr relabelfrom relabelto };
 
 # init.mt6797.rc:80 `restorecon_recursive /dev/block/platform/mtk-msdc.0`
 # relabels the by-name symlinks from block_device to the per-partition types.

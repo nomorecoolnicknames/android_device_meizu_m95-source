@@ -30,3 +30,15 @@ allow rild pmsg_device:chr_file w_file_perms;
 # on /dev/__properties__/u:object_r:m95_handover_prop:s0, scontext=u:r:rild:s0
 # (permissive-complete boot, 2026-08-21). mtkmal sets it, rild reads it.
 get_prop(rild, m95_handover_prop)
+
+# 2026-09-24 (A13, b16 captures m95-b16-noims-20260924 and
+# m95-b16-rild-crash-20260924): FACT denied { sys_resource } capability=24
+# comm=rild, once per rild start (x16 across the crash loop; the crash itself
+# is a SIGSEGV at 0x141, tombstone_41, not a denial). rild runs as uid 0 and
+# the call behind it is not identified -- INFERENCE: an rlimit or pipe-size
+# raise at start-up. Granted so that enforcing does not change rild's start-up
+# path under the RIL lane's feet; unlike dac_override above it bypasses no
+# file permission.
+# FALSIFIER: `strace -f -e trace=setrlimit,prlimit64,fcntl,setpriority -p`
+# on a fresh rild; if the EPERM-returning call is harmless, drop this rule.
+allow rild self:capability sys_resource;
