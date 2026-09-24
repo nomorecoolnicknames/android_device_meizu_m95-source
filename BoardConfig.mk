@@ -316,8 +316,16 @@ BOARD_HAVE_BLUETOOTH := true
 # Dual SIM (FACT, 16.0 tree: SIM_COUNT=2 required for slot2 + 4-arg RIL env).
 SIM_COUNT := 2
 
-# N-era MTK RIL blob: libril must send the 8th setupDataCall string.
+# N-era MTK RIL blob hosted by the AOSP rild.  BOARD_USES_MTK_LEGACY_RIL is
+# the switch hardware/ril (branch meizu-legacy-vendor) reads on lineage-20: it
+# builds librilmtk (our libril under the soname mtk-ril.so needs, librilimp in
+# DT_NEEDED), links rild against it and compiles the MTK paths with
+# -DMTK_HARDWARE (the 8th setupDataCall string, the seven-member RIL_Env,
+# per-channel serialisation, the rild-mal server, ...).  On 18.1 the same
+# switch was BOARD_USES_MTK_HARDWARE; on lineage-20 m2note and m5s set that one
+# too and have no librilimp module, so hardware/ril no longer reads it.
 BOARD_USES_MTK_HARDWARE := true
+BOARD_USES_MTK_LEGACY_RIL := true
 
 # MTK gralloc0+fb module wrapped by the mapper@2.1 Gralloc0Hal adapter; the MTK
 # vendor usage bit 26 must be accepted (FACT, 16.0 camera fix).

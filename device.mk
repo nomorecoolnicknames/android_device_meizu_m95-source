@@ -52,6 +52,19 @@ PRODUCT_PACKAGES += \
     vulkan.mt6797_symlinks \
     librilimp
 
+# RIL instance-unification, as on 18.1 (A11_BRINGUP_STATE.md §2m,
+# SIM_LANE_STATE.md).  Our patched libril is emitted a second time under the
+# soname the vendor blob already needs, librilmtk.so, so mtk-ril.so's
+# RIL_onRequestComplete binds to OUR pending-request list; rild links it
+# instead of libril.  librilimp (above) is the stock MTK libril, renamed, for
+# the 11 modem-internal symbols we do not implement.  64-bit only.  The module
+# comes from hardware/ril branch meizu-legacy-vendor under
+# BOARD_USES_MTK_LEGACY_RIL (BoardConfig.mk); rild would pull it in anyway,
+# naming it here makes a tree without that branch fail at build time instead
+# of shipping a rild that cannot load mtk-ril.so.
+PRODUCT_PACKAGES += \
+    librilmtk
+
 # libstdc++ (bionic's small one) as a VENDOR copy: the 32-bit Mali closure
 # (libGLES_mali -> ... -> libvcodec_oal.so) needs it, and it is neither LLNDK
 # nor VNDK, so a vendor process cannot see the /system/lib copy.
@@ -441,10 +454,9 @@ PRODUCT_DEFAULT_PROPERTY_OVERRIDES += \
 #    has not been rebuilt against API 33 and would not compile.  VoLTE is out of
 #    scope for the first Android 13 boot.
 #
-#  * librilmtk.  On 18.1 this was OUR patched libril emitted a second time under
-#    the soname the vendor blob needs, and it lives in hardware/ril, not in the
-#    device tree.  hardware/ril in this tree is unpatched, so the module does
-#    not exist.  Telephony will not come up until it is ported back.
+#  * (librilmtk used to be listed here.  It is carried over again: see the
+#    PRODUCT_PACKAGES block next to librilimp and hardware/ril branch
+#    meizu-legacy-vendor.)
 #
 #  * libcamera_client_vendor.  Same story: an 18.1-local vendor variant of a
 #    frameworks/av library.  Android 13 does not ship one.  camera.mt6797.so
