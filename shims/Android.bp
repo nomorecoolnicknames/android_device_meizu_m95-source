@@ -12,6 +12,7 @@ cc_library_shared {
     name: "libm95shim_gui",
     defaults: ["m95shim_defaults"],
     srcs: ["gui.cpp"],
+    shared_libs: ["liblog"],
     // No shared_libs: both symbols declared manually and resolved at
     // runtime under VNDK-lite (see gui.cpp). Linking system libgui here
     // is a build-time VNDK violation.
@@ -45,8 +46,14 @@ cc_library_shared {
 cc_library_shared {
     name: "libsensor_m95",
     defaults: ["m95shim_defaults"],
-    srcs: ["stub.cpp"],
-    shared_libs: ["libsensor_vendor"],
+    srcs: [
+        "stub.cpp",
+        "sensor.cpp",
+    ],
+    shared_libs: [
+        "libsensor_vendor",
+        "liblog",
+    ],
 }
 
 cc_library_shared {
@@ -75,7 +82,11 @@ cc_library_shared {
 cc_library_shared {
     name: "libm95shim_utils",
     defaults: ["m95shim_defaults"],
-    srcs: ["utils.cpp"],
+    srcs: [
+        "utils.cpp",
+        "propertymap.cpp",
+    ],
+    shared_libs: ["libutils"],
     // MemoryHeapBase forwarders resolve R libbinder ctors at runtime (lite).
     allow_undefined_symbols: true,
 }

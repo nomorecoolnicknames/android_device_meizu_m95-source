@@ -165,3 +165,19 @@ extern "C" M95SpRet _ZNK7android10GLConsumer16getCurrentBufferEv(const void* sel
     return _ZNK7android10GLConsumer16getCurrentBufferEPi(self, nullptr);
 }
 #pragma clang diagnostic pop
+
+// ---- Surface::Surface(const sp<IGraphicBufferProducer>&, bool) -------------
+// The pre-S two-argument constructor, imported by libeffecthal.base.so
+// (NSCam::EffectHalClient::setOutputSurfaces). Without the symbol the whole
+// camera HAL fails to load. It is NOT forwarded to the A13 constructor on
+// purpose: the blob allocates the object itself with the N size
+// (lib64: "mov w0, #3560; bl _Znwm"), while an A13 Surface needs about 8 KiB
+// (BLASTBufferQueue::getSurface allocates 8224 bytes for BBQSurface), so
+// constructing into that block would overrun the heap by ~4.6 KiB. Abort
+// loudly instead of corrupting memory; only camera effect paths reach it.
+#include <log/log.h>
+extern "C" void _ZN7android7SurfaceC1ERKNS_2spINS_22IGraphicBufferProducerEEEb(
+        void* /*self*/, const void* /*bufferProducer*/, bool /*controlledByApp*/) {
+    LOG_ALWAYS_FATAL("m95: legacy Surface(sp<IGraphicBufferProducer>, bool) called "
+                     "(camera effect HAL); the N-sized allocation cannot hold an A13 Surface");
+}
