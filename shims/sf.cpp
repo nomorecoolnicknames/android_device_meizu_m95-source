@@ -27,12 +27,6 @@ struct NullSp {
 
 extern "C" {
 
-// SurfaceComposerClient::getBuiltInDisplay(int) -> display id; 0 = primary.
-int32_t _ZN7android21SurfaceComposerClient17getBuiltInDisplayEi(void* /*self*/,
-                                                                int /*id*/) {
-    return 0;
-}
-
 // SurfaceComposerClient::openGlobalTransaction() -> void.
 void _ZN7android21SurfaceComposerClient21openGlobalTransactionEv(void* /*self*/) {
 }
@@ -104,4 +98,61 @@ struct SpRet {
 extern "C" SpRet _ZN7android11IDumpTunnel11asInterfaceERKNS_2spINS_7IBinderEEE(void* /*binder*/) {
     return SpRet();
 }
+
+// static sp<IBinder> SurfaceComposerClient::getBuiltInDisplay(int32_t id) --
+// removed in Q. Returns a null sp<> through the sret slot. The earlier entry
+// returned an int and took a phantom `self`, so it never wrote the slot:
+// libperfservice.so getDisplayResolution() (0x8ecc) then decStrong()s the
+// slot at 0x8f00-0x8f18 when it is non-null -- i.e. whatever the stack held.
+extern "C" SpRet _ZN7android21SurfaceComposerClient17getBuiltInDisplayEi(int32_t /*id*/) {
+    return SpRet();
+}
 #pragma clang diagnostic pop
+
+// static status_t SurfaceComposerClient::getDisplayInfo(const sp<IBinder>&,
+// DisplayInfo*) -- removed in S (A13 libgui has getStaticDisplayInfo /
+// getActiveDisplayMode instead). Imported by libgui_ext.so and
+// libperfservice.so; hwcomposer.mt6797.so cannot load without it (A13 link
+// audit, designs/M95_LINK_AUDIT_20260924.md). Both callers ignore the status
+// and read w/h straight out of the struct (libgui_ext GuiExtPool::alloc
+// 0x17350 -> ldr [sp,#40]; libperfservice getDisplayResolution 0x8ed8 ->
+// ldp [sp,#8]), so the struct must be filled. Asking SurfaceFlinger is not an
+// option from a vendor process: vendor libgui talks to /dev/vndbinder, where
+// SF is not registered, and ComposerService would wait for it forever.
+// Values: what this handset's HWC reported to the framework (LOS 16,
+// captures/m95-boot-20260807/m95-logcat-1821.txt:1815: 1080 x 1920,
+// fps=60.360004, density 480, 480.0 x 480.0 dpi, appVsyncOff 1000000,
+// presDeadline 16567262, FLAG_SECURE).
+namespace {
+// N/O/P layout (los16-ct07 frameworks/native/include/ui/DisplayInfo.h); the
+// caller reserves exactly these 48 bytes (libperfservice: sp+8 .. sp+56).
+struct M95DisplayInfoN {
+    uint32_t w;
+    uint32_t h;
+    float xdpi;
+    float ydpi;
+    float fps;
+    float density;
+    uint8_t orientation;
+    bool secure;
+    int64_t appVsyncOffset;
+    int64_t presentationDeadline;
+};
+static_assert(sizeof(M95DisplayInfoN) == 48, "N DisplayInfo is 48 bytes");
+}  // namespace
+
+extern "C" int32_t _ZN7android21SurfaceComposerClient14getDisplayInfoERKNS_2spINS_7IBinderEEEPNS_11DisplayInfoE(
+        const void* /*display*/, M95DisplayInfoN* info) {
+    if (info == nullptr) return -22;  // BAD_VALUE
+    info->w = 1080;
+    info->h = 1920;
+    info->xdpi = 480.0f;
+    info->ydpi = 480.0f;
+    info->fps = 60.36f;
+    info->density = 3.0f;
+    info->orientation = 0;
+    info->secure = true;
+    info->appVsyncOffset = 1000000;
+    info->presentationDeadline = 16567262;
+    return 0;  // NO_ERROR
+}
