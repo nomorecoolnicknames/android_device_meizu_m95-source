@@ -225,6 +225,9 @@
 # of its own -- full recipe in SELINUX_ENFORCING_PLAN.md §4.2. Under enforcing
 # as it stands today the daemon does not start and the fingerprint dies, so
 # this is a hard blocker, not a cosmetic one.
+# 2026-09-24 (A13): resolved -- the daemon has its vendor domain goodixfpd
+# (fingerprintd.te) and is labelled below.
+/(vendor|system/vendor)/bin/goodixfingerprintd  u:object_r:goodixfpd_exec:s0
 
 ##########################
 # Vendor executables (installed under /system/vendor in this semi-treble

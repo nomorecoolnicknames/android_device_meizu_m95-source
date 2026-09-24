@@ -33,3 +33,10 @@ type surfaceflinger_vndservice, vndservice_manager_type;
 # MTK picture-quality daemon's binder service. The registered name is "PQ",
 # read off a live device from the denial itself (see pq.te). [DEV]
 type pq_service, service_manager_type, vendor_service;
+
+# 2026-09-24 (A13): IGoodixFingerprintDaemon lives in vndservicemanager --
+# goodixfingerprintd links the VNDK libbinder (/dev/vndbinder). FACT (192234):
+# { add } by the daemon and { find } by hal_fingerprint_default on
+# default_android_vndservice. goodixfingerprintd_service above (framework
+# servicemanager) has no registrant on A13 any more. See fingerprintd.te.
+type goodixfpd_vndservice, vndservice_manager_type;
