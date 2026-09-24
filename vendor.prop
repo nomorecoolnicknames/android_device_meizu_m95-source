@@ -16,6 +16,10 @@ ro.hardware.sensors=mt6797
 # RIL (VERBATIM stock build.prop; rild loads mtk-ril.so, IRadio 1.1 live).
 rild.libpath=mtk-ril.so
 rild.libargs=-d /dev/ttyC0
+# Android 13's rild reads the vendor.-prefixed name (PRODUCT_COMPATIBLE_PROPERTY
+# is forced true). The library path is given on the ril-daemon-mtk command
+# line (-l), deliberately not as vendor.rild.libpath: see init.m95.modem.rc.
+vendor.rild.libargs=-d /dev/ttyC0
 ro.telephony.default_network=10,10
 persist.radio.multisim.config=dsds
 ro.telephony.sim.count=2

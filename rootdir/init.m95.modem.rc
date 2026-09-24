@@ -123,12 +123,29 @@ service gsm0710muxdmd2 /vendor/bin/gsm0710muxdmd2 -s /dev/ccci2_tty0 -f 512 -n 8
 # HIDL rild and starts THIS name; pointing it at mtkrild would trade the
 # working HIDL registration for a socket RIL Pie cannot talk to. Running
 # rild here also fixes ordering: it now starts only after /dev/radio/ptty*
-# exist instead of retrying every 10 s. rild reads rild.libpath/rild.libargs
-# from system.prop, same as the legacy instance did. (Previous exec:
+# exist instead of retrying every 10 s. (Previous exec:
 # /vendor/bin/mtkrild — stock's Nougat layout, init.rilproxy.rc:26-48; the
 # mrild* socket set is kept, mtk-ril.so grabs its control sockets from the
 # environment.)
-service ril-daemon-mtk /vendor/bin/hw/rild
+#
+# Android 13: the library comes from `-l`, not from rild.libpath. On 18.1
+# PRODUCT_COMPATIBLE_PROPERTY was false (measured, device-18.1 device.mk), so
+# rild read rild.libpath/rild.libargs. On lineage-20 build/make/core/config.mk
+# forces it true, rild is built with -DPRODUCT_COMPATIBLE_PROPERTY and reads
+# vendor.rild.libpath/vendor.rild.libargs instead; with neither set it logged
+# "RILd param count=1" and went straight to "RIL_Init starting sleep loop"
+# without ever opening mtk-ril.so [FACT: meizu-fleet/captures/
+# m95-boot-20260924-113630/logcat-1.txt:5486-5488].
+#   - The path is NOT set as vendor.rild.libpath: vendor.ril-daemon below
+#     (class main, disabled) is started anyway by every `class_restart main`
+#     (vndservicemanager.rc onrestart; init's Service::Restart() starts a
+#     stopped service regardless of `disabled`), and with that property it
+#     would load a second mtk-ril.so next to this one.
+#   - The args are NOT passed after `--`: in that branch rild appends
+#     "-c <id>" through the argv array itself, i.e. over argv's NULL and
+#     envp[0]. They come from vendor.rild.libargs (vendor.prop) instead,
+#     which rild copies into a static array.
+service ril-daemon-mtk /vendor/bin/hw/rild -l mtk-ril.so
     class core
     socket mrild stream 660 root radio
     socket mrild2 stream 660 root radio
@@ -291,6 +308,11 @@ service terservice /vendor/bin/terservice
 # the Nougat mtk-ril.so that is a guaranteed crash-loop, and the socket RIL
 # it served no longer exists in Pie. Defined here first and disabled.
 # [FACT: telephony.mk:27 adds rild; rild.rc content verified in the Pie tree]
+# lineage-20: `disabled` does not keep it down. Every vndservicemanager
+# restart runs `class_restart main`, which starts it [FACT: 2026-09-24 11:36
+# capture, started and SIGKILLed every ~5 s while vndservicemanager
+# crash-looped]. It stays harmless only because it gets no library: no `-l`
+# here and no vendor.rild.libpath anywhere, so rild takes its "no-ril" path.
 service vendor.ril-daemon /vendor/bin/hw/rild
     class main
     user radio
