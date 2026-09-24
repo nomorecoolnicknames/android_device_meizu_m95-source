@@ -115,3 +115,8 @@ allow ccci_mdinit sysfs_ccci:dir search;
 # tty. FACT: { setuid } self capability (x2). setgid not observed; add it
 # only if a denial names it.
 allow gsm0710muxd self:capability setuid;
+
+# 2026-09-24 (A13): /data/ccci_cfg has its own type (file.te). ccci_mdinit
+# keeps the modem's config files there (MD1/MD3 version stamps).
+allow ccci_mdinit ccci_cfg_file:dir create_dir_perms;
+allow ccci_mdinit ccci_cfg_file:file create_file_perms;

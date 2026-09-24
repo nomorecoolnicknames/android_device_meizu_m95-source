@@ -435,3 +435,27 @@
 # .software variant this device installs; unlabeled -> init refuses to start it
 # -> LockSettingsService NPE on IGateKeeper.
 /(vendor|system/vendor)/bin/hw/android\.hardware\.gatekeeper@1\.0-service\.software  u:object_r:hal_gatekeeper_default_exec:s0
+
+##########################
+# 2026-09-24 (Android 13, SELinux lane).
+
+# HIDL clearkey. A13's system/sepolicy/vendor/file_contexts:36 labels only the
+# AIDL android.hardware.drm-service.clearkey; the @1.4 HIDL binary this build
+# still installs stayed vendor_file, so init ran it in its own domain. FACT
+# (both captures): "File /vendor/bin/hw/android.hardware.drm@1.4-service.
+# clearkey (labeled "u:object_r:vendor_file:s0") has incorrect label or no
+# domain transition" x26, and init itself adding IDrmFactory to
+# hwservicemanager. Under enforcing init refuses to start it
+# (system/core/init/service.cpp:97). hal_drm_default is the A13 domain for
+# HIDL DRM factories and already serves hal_drm_hwservice.
+/(vendor|system/vendor)/bin/hw/android\.hardware\.drm@1\.4-service\.clearkey  u:object_r:hal_drm_default_exec:s0
+
+# zram. The plat label is ram_device (private/file_contexts:87), which A13
+# gives neither init (swapon) nor toolbox (mkswap); swap_block_device is the
+# type both hold rights on. FACT (both captures): denied { write } zram0
+# scontext=init and { read write open ioctl getattr } comm=mkswap
+# scontext=toolbox, tcontext=ram_device. Under enforcing: no zram swap.
+/dev/block/zram0        u:object_r:swap_block_device:s0
+
+# Modem config store (file.te ccci_cfg_file).
+/data/ccci_cfg(/.*)?    u:object_r:ccci_cfg_file:s0

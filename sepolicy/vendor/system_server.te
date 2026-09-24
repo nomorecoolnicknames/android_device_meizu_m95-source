@@ -1,0 +1,6 @@
+# system_server -- device extras.
+
+# BootReceiver files /proc/last_kmsg into dropbox (SYSTEM_LAST_KMSG). The node
+# is m95_proc_last_kmsg (file.te). FACT (192234): denied { read open getattr }
+# path=/proc/last_kmsg comm=Thread-15 scontext=system_server tcontext=proc.
+allow system_server m95_proc_last_kmsg:file r_file_perms;
