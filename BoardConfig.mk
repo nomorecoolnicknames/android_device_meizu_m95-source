@@ -147,6 +147,35 @@ BOARD_MKBOOTIMG_ARGS := --kernel_offset $(BOARD_KERNEL_OFFSET) \
 # after a denial census, not before the first boot.
 BOARD_KERNEL_CMDLINE += androidboot.selinux=permissive
 
+# Производительность: погасить самые дорогие отладочные механизмы ядра, не
+# пересобирая его (подробно — meizu-fleet/trees/M95_PREFLASH_PERF.md §1).
+#
+# FACT: прибилт #145 собран из lineage_m95_defconfig, унаследованного от
+# отладочного mx6_defconfig Meizu: MT_ENG_BUILD, PROVE_LOCKING, SLUB_DEBUG_ON,
+# DMA_API_DEBUG, MTK_FTRACE_DEFAULT_ENABLE (.config той же сборки, KERNEL_OBJ
+# 18.1, Image.gz-dtb sha256 b84b732d…).  Стоковое user-ядро Flyme ничего из
+# этого не содержит: в его Image нет ни строк lockdep, ни DMA-API, ни проверок
+# SLUB.  Вдобавок LK сам ставит в начало cmdline `slub_debug=O`, что на нашем
+# ядре значит полную отладку SLUB (F/Z/P/U, снятие стека на каждый kmalloc и
+# kfree, медленный путь аллокатора) почти для всех кэшей (mm/slub.c:1205,1224).
+# Наши параметры идут ПОСЛЕ префикса LK (captures/m95-boot-b13-20260807/
+# dmesg-first-b13.txt:57), поэтому побеждают:
+#   slub_debug=-             отладка SLUB выключена целиком (mm/slub.c:1228-1229);
+#   lockdep.prove_locking=0  без проверки графа зависимостей на каждом захвате
+#                            блокировки (kernel/locking/lockdep.c:61-62, 3115);
+#   dma_debug=off            без учёта каждого dma_map_* и без предвыделения
+#                            таблицы записей (lib/dma-debug.c:997, 1027-1037);
+#   trace_buf_size=1M        MTK на late_initcall включает ftrace и растит буфер
+#                            до 4 МБ на КАЖДЫЙ CPU (kernel/trace/trace.c:340-341,
+#                            mtk_trace.c:248-267), т.е. 40 МБ ОЗУ при 10 ядрах;
+#                            запись всё равно гасит atrace.rc на late-init.
+# Все четыре только выключают диагностику, поведение драйверов не меняется.
+# Откат — удалить строку.  Проверка на аппарате: /proc/cmdline;
+# /sys/module/lockdep/parameters/prove_locking = 0; в dmesg «DMA-API: debugging
+# disabled on kernel command line»; /sys/kernel/slab/kmalloc-64/red_zone = 0;
+# /sys/kernel/debug/tracing/buffer_size_kb = 1024.
+BOARD_KERNEL_CMDLINE += slub_debug=- lockdep.prove_locking=0 dma_debug=off trace_buf_size=1M
+
 # ---------------------------------------------------------------------------
 # Partitions — A-only, no slots, no dynamic partitions.
 # ---------------------------------------------------------------------------
