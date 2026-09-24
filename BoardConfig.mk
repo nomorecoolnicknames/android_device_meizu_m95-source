@@ -360,11 +360,24 @@ include vendor/meizu/m95/BoardConfigVendor.mk
 # На хосте проверено: secilc без -N rc=0; sepolicy_neverallows_vendor
 # (checkpolicy) rc=0; sepolicy_tests.py rc=0; treble_sepolicy_tests
 # CoredomainViolations/ViolatorAttributes/CoreDatatypeViolations rc=0
-# (--fake-treble, т.к.
-# PRODUCT_FULL_TREBLE_OVERRIDE := true); checkfc по file/property/
-# vndservice_contexts OK.
+# (--fake-treble, т.к. PRODUCT_FULL_TREBLE_OVERRIDE := true); checkfc по
+# file/property/vndservice_contexts OK.
 # НЕ проверено на хосте: treble_sepolicy_tests TrebleCompatMapping (нужны
 # старые плат-политики 28..32), sepolicy-analyze и sepolicy_compat_test.
 # Если сборка упадёт именно на них -- вернуть строку ниже этим же коммитом
 # (git revert), а не глушить отдельные правила.
 # SELINUX_IGNORE_NEVERALLOWS := true
+
+# Camera RAW16: libm95_camera_metadata_raw must be global in the camera provider
+# before MediaTek's metadata store asks dlsym(RTLD_DEFAULT) for the IMX386 stream
+# table (camera_metadata_raw/m95_scaler_raw.cpp). A shim of the executable is
+# loaded with it, RTLD_GLOBAL, ahead of its DT_NEEDED
+# (bionic/linker/linker_main.cpp:450-484), and unlike LD_PRELOAD it is not
+# discarded under AT_SECURE. The provider gets AT_SECURE: it runs as cameraserver
+# with `capabilities SYS_NICE`, and this 3.18 kernel still marks any non-root exec
+# with a non-empty permitted set secure (kernel/m685 security/commoncap.c:653-656);
+# under enforcing the init -> hal_camera_default transition would set it anyway.
+# If the library is missing from the image the provider cannot link at all --
+# keep it in PRODUCT_PACKAGES (device.mk).
+TARGET_LD_SHIM_LIBS += \
+    /vendor/bin/hw/android.hardware.camera.provider@2.4-service|/vendor/lib/libm95_camera_metadata_raw.so

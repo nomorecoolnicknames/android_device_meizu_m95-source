@@ -99,6 +99,40 @@ debug.camera.force_device=3
 # validator rejects the sizes it does not carry in tag 0xd000a.
 persist.camera.big_yuv=1
 
+# RAW16 in the framework copy of the stream table, for both cameras. FACT (LOS20
+# build 15, 2026-09-24): both cameras list RAW in availableCapabilities, but
+# availableStreamConfigurations carries formats 33/34/35/YV12 only, and Google
+# Camera 8.9 (BSG MGC) dies at start on a null where the list of raw sizes should
+# be -- the LOS16 failure again ("Attempt to get length of null array" in
+# MetadataConverter.getGcamRawFormat, meizu_mx6_m95/analysis-lanes/gcam-builds.md
+# :91-93,176-182). GCam walks formats 32 -> 37 -> 35 on EVERY camera it
+# enumerates, and getOutputSizes() of an absent format is null, so the front
+# module needs a row exactly as much as the back one does.
+#   fake_raw  -- normalizeRawStreamConfigurations() in CameraModule.cpp adds
+#                RAW16 4032x3016 (the IMX386 pixel array) with 30 fps durations;
+#                without it dropUnbackedRawCapability() strips the RAW claim.
+#   raw_front -- the same for the OV5695 at its own 2592x1944; it only acts
+#                when fake_raw is also set.
+# These are claims in the framework copy only. AppStreamMgr::checkStream judges
+# the vendor copy of tag 0xd000a, so on their own they get GCam past its start,
+# not a raw frame: on LOS16 Arnova 5.1.018 photographed (HDR+ over YUV) with
+# exactly this pair, and the 7.3 builds, which configure a raw stream, went black.
+# Real RAW16 delivery needs a RAW row in the vendor copy too: on LOS16 a 24 MB
+# DNG came out only while that row existed (analysis-lanes/stream-table.md, the
+# 2026-08-19 section). Same values as LOS16 los/device/meizu/m95/device.mk:521-536.
+persist.camera.fake_raw=1
+persist.camera.raw_front=1
+
+# RAW16 in the VENDOR copy of the rear stream table: libm95_camera_metadata_raw
+# (camera_metadata_raw/, loaded into the provider through TARGET_LD_SHIM_LIBS
+# in BoardConfig.mk) appends [32 4032 3016 OUTPUT] and its two
+# duration rows after the vendor's IMX386 section has built its table. That is
+# the copy AppStreamMgr::checkStream and the pipeline read; on LOS16 a RAW16
+# frame arrived only while it carried this row. Read when the provider builds
+# its static metadata: 0 (or unset) makes the library a pass-through after a
+# provider restart. The front sensor is not touched here.
+persist.camera.raw=1
+
 # Log suppression for known blob floods (FACT, measured on device).
 log.tag.AudioParamParser=S
 log.tag.SensorHAL=I
