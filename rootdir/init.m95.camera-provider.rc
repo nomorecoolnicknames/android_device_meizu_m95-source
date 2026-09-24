@@ -1,0 +1,26 @@
+# The camera provider, redefined only to preload libm95_camera_metadata_raw.
+#
+# MediaTek's metadata store asks dlsym(RTLD_DEFAULT) for the IMX386 stream
+# table, and bionic answers from RTLD_GLOBAL libraries first, in load order
+# (bionic/linker/linker.cpp dlsym_linear_lookup). A preloaded library is global
+# and loaded before anything else, so its answer is the one found; the store
+# itself is local to the dlopen'ed HAL. See camera_metadata_raw/.
+#
+# Everything else is copied verbatim from
+# hardware/interfaces/camera/provider/2.4/default/
+# android.hardware.camera.provider@2.4-service.rc -- keep the two in step.
+# `override` replaces that definition: init reads /vendor/etc/init in sorted
+# order, so this file comes after it, and both live on /vendor, which the
+# override check requires (system/core/init/service_parser.cpp EndSection).
+#
+# Check on the device: grep m95_camera_metadata_raw /proc/<provider pid>/maps
+service vendor.camera-provider-2-4 /vendor/bin/hw/android.hardware.camera.provider@2.4-service
+    override
+    interface android.hardware.camera.provider@2.4::ICameraProvider legacy/0
+    class hal
+    user cameraserver
+    group audio camera input drmrpc
+    ioprio rt 4
+    capabilities SYS_NICE
+    task_profiles CameraServiceCapacity MaxPerformance
+    setenv LD_PRELOAD /vendor/lib/libm95_camera_metadata_raw.so

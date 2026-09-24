@@ -1,0 +1,25 @@
+// The library that answers MediaTek's dlsym for the IMX386 stream table and
+// appends the RAW16 4032x3016 row to the vendor's own copy of it. See
+// m95_scaler_raw.cpp for why, and init.m95.camera-provider.rc for how it gets
+// into the provider (LD_PRELOAD).
+//
+// 32-bit only: the provider that loads the camera HAL is the 32-bit
+// android.hardware.camera.provider@2.4-service. No link against any camera
+// blob -- see m95_nscam_metadata.h; the only undefined symbols are liblog,
+// libcutils and libdl ones (checked with nm -u on 2026-09-24).
+cc_library_shared {
+    name: "libm95_camera_metadata_raw",
+    vendor: true,
+    compile_multilib: "32",
+    srcs: ["m95_scaler_raw.cpp"],
+    shared_libs: [
+        "libcutils",
+        "liblog",
+    ],
+    stl: "none",
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wno-unused-parameter",
+    ],
+}

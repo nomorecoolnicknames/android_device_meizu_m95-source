@@ -293,6 +293,15 @@ PRODUCT_PACKAGES += \
     android.hardware.bluetooth@1.0-impl \
     android.hardware.bluetooth@1.0-service
 
+# RAW16 for the rear camera: libm95_camera_metadata_raw appends the 4032x3016
+# row to the vendor's own stream table (the copy AppStreamMgr::checkStream and
+# the pipeline read), and init.m95.camera-provider.rc preloads it into the
+# 32-bit provider. Off switch without a reflash: persist.camera.raw=0 and a
+# provider restart. See camera_metadata_raw/m95_scaler_raw.cpp.
+PRODUCT_PACKAGES += \
+    libm95_camera_metadata_raw \
+    init.m95.camera-provider.rc
+
 # Gatekeeper: the AOSP SOFTWARE implementation instead of the MediaTek blob.
 # The framework cannot live without an IGatekeeper (18.1, vendor17: with none
 # registered LockSettingsService throws and system_server restarts every ~2

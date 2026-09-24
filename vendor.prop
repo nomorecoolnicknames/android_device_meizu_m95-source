@@ -123,6 +123,16 @@ persist.camera.big_yuv=1
 persist.camera.fake_raw=1
 persist.camera.raw_front=1
 
+# RAW16 in the VENDOR copy of the rear stream table: libm95_camera_metadata_raw
+# (camera_metadata_raw/, preloaded into the provider by
+# init.m95.camera-provider.rc) appends [32 4032 3016 OUTPUT] and its two
+# duration rows after the vendor's IMX386 section has built its table. That is
+# the copy AppStreamMgr::checkStream and the pipeline read; on LOS16 a RAW16
+# frame arrived only while it carried this row. Read when the provider builds
+# its static metadata: 0 (or unset) makes the library a pass-through after a
+# provider restart. The front sensor is not touched here.
+persist.camera.raw=1
+
 # Log suppression for known blob floods (FACT, measured on device).
 log.tag.AudioParamParser=S
 log.tag.SensorHAL=I
