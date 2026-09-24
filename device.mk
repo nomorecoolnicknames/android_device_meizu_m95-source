@@ -125,6 +125,34 @@ PRODUCT_PROPERTY_OVERRIDES += \
     dalvik.vm.heapminfree=512k \
     dalvik.vm.heapmaxfree=8m
 
+# Dexpreopt: AOT-compile ("speed") the apps the owner touches first.
+#
+# FACT (build of 2026-09-16, compiler-filter in the odex headers of the target
+# files): only SystemUI and TrebuchetQuickStep -- LineageOS's own speed list,
+# out/soong/dexpreopt.config SpeedApps -- and the system-server apps came out
+# "speed".  Everything else, the apps below included, is "verify": none of
+# them ships a profile (dexpreopt_config/<app>_dexpreopt.config) and the
+# fallback filter compiles no code (build/soong/dexpreopt/dexpreopt.go:403-413).
+# Such an app runs interpreted + JIT, and the JIT code dies with the process,
+# until the daily idle-and-charging bg-dexopt (pm.dexopt.bg-dexopt=
+# speed-profile) has collected a profile and run -- so the first days after a
+# flash are exactly when the keyboard, Settings and the dialer stutter.
+# Cost: about 110 MB of /system (odex ~2.4x dex, calibrated on SystemUI:
+# 12.6 MB dex -> 30.0 MB odex); the system image holds 1.8 GB today.
+# Check after the build:
+#   strings -n3 <app>/oat/arm64/<app>.odex | grep -A1 -x compiler-filter
+PRODUCT_DEXPREOPT_SPEED_APPS += \
+    Settings \
+    LatinIME \
+    Dialer \
+    Contacts \
+    messaging \
+    Aperture \
+    DocumentsUI \
+    IntentResolver \
+    PackageInstaller \
+    TeleService
+
 PRODUCT_AAPT_CONFIG := normal
 PRODUCT_AAPT_PREF_CONFIG := xxhdpi
 
