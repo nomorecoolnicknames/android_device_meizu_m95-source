@@ -7,3 +7,6 @@
 # strings from the denials of capture m95-boot-20260924-192234.
 
 android.hardware.fingerprint.IGoodixFingerprintDaemon  u:object_r:goodixfpd_vndservice:s0
+NvRAMAgent                                             u:object_r:nvram_agent_vndservice:s0
+GuiExtService                                          u:object_r:guiext_vndservice:s0
+PQ                                                     u:object_r:pq_vndservice:s0

@@ -37,3 +37,10 @@ get_prop(nvram_agent_binder, nvram_prop)
 # FACT: { read open } /sys/devices/virtual/BOOT/BOOT/boot/boot_mode,
 # tcontext generic sysfs. Read-only.
 allow nvram_daemon sysfs:file r_file_perms;
+
+# 2026-09-24 (A13): NvRAMAgent registers with vndservicemanager. FACT (192234):
+# { open read write ioctl } /dev/vndbinder, { call transfer }
+# vndservicemanager, { add } name=NvRAMAgent on default_android_vndservice.
+# No client find observed in the captures; one will census as a denial.
+vndbinder_use(nvram_agent_binder)
+add_service(nvram_agent_binder, nvram_agent_vndservice)

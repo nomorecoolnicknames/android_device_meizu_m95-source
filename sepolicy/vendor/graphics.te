@@ -141,3 +141,9 @@ allowxperm {
   hal_camera_default
   mediacodec
 } proc_cmdq:file ioctl { 0x7801-0x780c };
+
+# 2026-09-24 (A13): GuiExtService registration on vndservicemanager. FACT
+# (192234): { add find } name=GuiExtService by the composer on
+# default_android_vndservice. mediacodec deliberately gets NO find on it --
+# m95_enforcing.te round 23 (finding it deadlocks hardware video decode).
+add_service(hal_graphics_composer_default, guiext_vndservice)
