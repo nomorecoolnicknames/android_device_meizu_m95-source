@@ -191,3 +191,26 @@ vendor_internal_prop(m95_hwc_debug_prop)
 # FACT: denied { read } scontext=system_server tcontext=vendor_default_prop,
 # capture m95-boot-20260924-192234.
 vendor_restricted_prop(m95_exported_vendor_prop)
+
+##############################################################################
+# 2026-09-24, SELinux lane: PREPARED for paths the captures did not exercise
+# (voice call, VoLTE). The names come from strings, not from denials; the
+# first call under permissive must confirm them (design note, "unknowns").
+##############################################################################
+
+# MTK audio-HAL state and feature switches: af.modem_{1,2,ext}.status,
+# af.recovery.{dl,ul,mic}_mute_on, af.rf_{info,mode}, af.ril.* (speech codec,
+# HD voice), af.mixer.pcm, af.track.pcm, af.karaoke.*, af.resouce.*,
+# persist.af.* (13 names). Only audio.primary.mt6797.so carries them (strings
+# of mtk-ril, librilmtk, librilimp, mtkmal, libmal and the volte daemons have
+# no af.* at all); AudioFlinger's own af.* names (af.fast_track_multiplier,
+# af.tee, af.thread.throttle, af.patch_park, af.resampler.quality --
+# frameworks/av) are different names and stay where they are. On default_prop
+# the HAL can neither read nor set them under A13.
+vendor_internal_prop(m95_audio_hal_prop)
+
+# VoLTE stack bookkeeping: net.ims.ipsec.version, net.ims.volte.pid (strings
+# of volte_stack) and service.ims.icsi.* (volte_ua, volte_stack). The plat
+# `net.` and `service.` prefixes make them system_prop, which a vendor daemon
+# may neither read nor set.
+vendor_internal_prop(m95_volte_prop)

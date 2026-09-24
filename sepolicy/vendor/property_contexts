@@ -152,3 +152,16 @@ persist.m95.pq.enable           u:object_r:m95_pq_prop:s0
 
 # Vendor setting read by system_server (android_os_VintfObject.cpp:106).
 ro.vendor.vintf.legacy_kernel   u:object_r:m95_exported_vendor_prop:s0
+
+# PREPARED, not exercised in the captures (property.te, last block).
+af.modem_                       u:object_r:m95_audio_hal_prop:s0
+af.recovery.                    u:object_r:m95_audio_hal_prop:s0
+af.rf_                          u:object_r:m95_audio_hal_prop:s0
+af.ril.                         u:object_r:m95_audio_hal_prop:s0
+af.mixer.                       u:object_r:m95_audio_hal_prop:s0
+af.track.                       u:object_r:m95_audio_hal_prop:s0
+af.karaoke.                     u:object_r:m95_audio_hal_prop:s0
+af.resouce.                     u:object_r:m95_audio_hal_prop:s0
+persist.af.                     u:object_r:m95_audio_hal_prop:s0
+net.ims.                        u:object_r:m95_volte_prop:s0
+service.ims.                    u:object_r:m95_volte_prop:s0

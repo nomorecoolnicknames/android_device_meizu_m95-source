@@ -61,3 +61,12 @@ set_prop(hal_graphics_composer_default, m95_hwc_debug_prop)
 
 # ro.vendor.vintf.legacy_kernel, read by system_server's VintfObject JNI.
 get_prop(system_server, m95_exported_vendor_prop)
+
+##############################################################################
+# PREPARED (call / VoLTE paths, not exercised in the 2026-09-24 captures).
+##############################################################################
+# The audio HAL keeps modem-speech and mute-recovery state in af.* and reads
+# its persist.af.* feature switches.
+set_prop(hal_audio_default, m95_audio_hal_prop)
+# VoLTE daemons publish and read their IMS bookkeeping.
+set_prop({ volte_ua volte_stack volte_imcb }, m95_volte_prop)
