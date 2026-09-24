@@ -129,6 +129,7 @@ PRODUCT_PACKAGES += \
     libm95shim_ui \
     libm95shim_utils \
     libm95shim_sf \
+    libm95shim_nparcel \
     libm95shim_net \
     libm95shim_region \
     libm95shim_fs_mgr \
@@ -292,6 +293,15 @@ PRODUCT_PACKAGES += \
     android.hardware.wifi@1.0-service \
     android.hardware.bluetooth@1.0-impl \
     android.hardware.bluetooth@1.0-service
+
+# RAW16 for the rear camera: libm95_camera_metadata_raw appends the 4032x3016
+# row to the vendor's own stream table (the copy AppStreamMgr::checkStream and
+# the pipeline read). TARGET_LD_SHIM_LIBS in BoardConfig.mk loads it into the
+# 32-bit provider, which cannot link without it -- do not drop it from here.
+# Off switch without a reflash: persist.camera.raw=0 and a provider restart.
+# See camera_metadata_raw/m95_scaler_raw.cpp.
+PRODUCT_PACKAGES += \
+    libm95_camera_metadata_raw
 
 # Gatekeeper: the AOSP SOFTWARE implementation instead of the MediaTek blob.
 # The framework cannot live without an IGatekeeper (18.1, vendor17: with none

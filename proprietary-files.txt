@@ -1017,9 +1017,18 @@ vendor/res/sound/testpattern1.wav
 #       /vendor/lib{,64}/hw so the SYSTEM default namespace cannot see it.
 #   vendor/lib64/librilimp.so
 #       The stock MTK libril with its DT_SONAME rewritten; shipped as the
-#       `librilimp` prebuilt module in vendor/meizu/m95/Android.mk.
+#       `librilimp` prebuilt module in vendor/meizu/m95/Android.mk.  Then BOXED
+#       by tools/librilimp-box-nparcel.py: its 19 android::Parcel imports are
+#       renamed to android::Pbrcel in .dynstr and libm95shim_nparcel.so is added
+#       to DT_NEEDED, so the Nougat 104-byte Parcel it keeps by value no longer
+#       overruns the 120-byte A13 Parcel (rild SIGSEGV, capture
+#       m95-b16-rild-crash-20260924).  sha256 pristine d3d8309e...550a47 ->
+#       boxed 317fe586...5c9c1; librilimp.so.orig keeps the pristine blob.
 #   vendor/lib64/librilmtk.so
 #       The unmodified source of the above; kept for provenance, not installed.
+#   vendor/lib64/librilimp.so.orig
+#       Pre-box original of librilimp.so, kept so the box can be verified or
+#       reverted.  Never installed.
 #   vendor/lib/egl/libGLES_mali.so.orig, vendor/lib/libcam3_app.so.orig
 #       Pre-patch originals of byte-patched blobs, kept so the patch can be
 #       verified or reverted.  Never installed.

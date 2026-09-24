@@ -97,6 +97,25 @@ cc_library_shared {
     srcs: ["sf.cpp"],
 }
 
+// N-layout android::Parcel "box" for the stock MTK libril (librilimp.so). The
+// blob keeps 104-byte (Nougat) Parcels on the stack/heap; the A13 Parcel is 120
+// and overruns them (rild SIGSEGV, capture m95-b16-rild-crash-20260924). Its 19
+// Parcel imports are renamed to android::Pbrcel in .dynstr (tools/
+// librilimp-box-nparcel.py) and resolve HERE; each proxies to a heap-allocated
+// real Parcel whose pointer lives in the first 8 bytes of the blob's box. See
+// nparcel.cpp for the safety argument (no inline field access, no Parcel across
+// the librilimp boundary).
+cc_library_shared {
+    name: "libm95shim_nparcel",
+    defaults: ["m95shim_defaults"],
+    srcs: ["nparcel.cpp"],
+    shared_libs: [
+        "libbinder",
+        "libutils",
+        "liblog",
+    ],
+}
+
 // N-layout android::Region for the Mali EGL driver (see region.cpp). Mali's
 // libui.so DT_NEEDED is redirected to this library by wire-shims.py.
 cc_library_shared {

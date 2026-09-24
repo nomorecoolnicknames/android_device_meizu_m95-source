@@ -15,6 +15,21 @@
     нативно проходит uid-гейт сокета rild-ims.
 
     RCS намеренно НЕ объявляем: порт не несёт RcsFeature.
+
+    LineageOS 20 (Android 13), перепроверено по исходнику 2026-09-24:
+    PhoneGlobals.java:446-456 по-прежнему создаёт ImsResolver только при
+    FEATURE_TELEPHONY_IMS и читает обе строки из ресурсов TeleService; значение
+    доезжает до сборки (FACT: aapt2 dump у TeleService в out-m95 —
+    string/config_ims_mmtel_package = "com.mediatek.ims").
+
+    Пакет задаётся на УСТРОЙСТВО, а не на слот: ImsResolver.make(...,
+    getPhones().length) привязывает его для каждого слота, а на каком слоте
+    будет MMTEL, решает сам ImsService ответом querySupportedImsFeatures().
+    ForgeImsService объявляет MMTEL только на слоте основной возможности
+    (supportMims() == false) — и это намеренно: на 18.1 MMTEL на обоих слотах и
+    был тем, что роняло IMS (A11_BRINGUP_STATE.md §2r, «Слоты IMS»). Строка
+    «MmTelFeatureConnection [1]: create: binder is null!» на втором слоте —
+    ожидаемый шум фреймворка, а не дефект.
 -->
 <resources>
     <string name="config_ims_mmtel_package" translatable="false">com.mediatek.ims</string>
