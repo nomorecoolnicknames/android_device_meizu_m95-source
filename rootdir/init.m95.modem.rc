@@ -132,10 +132,15 @@ service gsm0710muxdmd2 /vendor/bin/gsm0710muxdmd2 -s /dev/ccci2_tty0 -f 512 -n 8
 # PRODUCT_COMPATIBLE_PROPERTY was false (measured, device-18.1 device.mk), so
 # rild read rild.libpath/rild.libargs. On lineage-20 build/make/core/config.mk
 # forces it true, rild is built with -DPRODUCT_COMPATIBLE_PROPERTY and reads
-# vendor.rild.libpath/vendor.rild.libargs instead; with neither set it logged
-# "RILd param count=1" and went straight to "RIL_Init starting sleep loop"
-# without ever opening mtk-ril.so [FACT: meizu-fleet/captures/
-# m95-boot-20260924-113630/logcat-1.txt:5486-5488].
+# vendor.rild.libpath/vendor.rild.libargs instead; with neither set the same
+# /vendor/bin/hw/rild binary logged "RILd param count=1" and went straight to
+# "RIL_Init starting sleep loop" without ever opening mtk-ril.so, although
+# rild.libpath=mtk-ril.so was set [FACT: meizu-fleet/captures/
+# m95-boot-20260924-113630/logcat-1.txt:5486-5488 and getprop-1.txt:391-392].
+# That instance was vendor.ril-daemon (pid 383, dmesg-1.txt:6068); this
+# service never started in that capture (the modem was still waiting for
+# NVRAM), so for ril-daemon-mtk the same outcome is an INFERENCE from the
+# identical binary and properties.
 #   - The path is NOT set as vendor.rild.libpath: vendor.ril-daemon below
 #     (class main, disabled) is started anyway by every `class_restart main`
 #     (vndservicemanager.rc onrestart; init's Service::Restart() starts a
