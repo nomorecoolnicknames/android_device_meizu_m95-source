@@ -13,3 +13,12 @@ debug.sf.enable_transaction_tracing=false
 # Legacy GLES RenderEngine: Skia-GL faults Mali r12p1 (FLYME13_KERNEL_PLAN.md:415-419).
 # System-side copy of vendor.prop:131 / init.mt6797.rc:59.
 debug.renderengine.backend=gles
+
+# adbd legacy (non-AIO) FFS path -- this 3.18 f_fs.c has no AIO, see the
+# comment next to sys.usb.ffs.aio_compat in vendor.prop. Moved here from
+# vendor.prop (2026-09-24): on default_prop it is settable from
+# system/build.prop (init context) but not from vendor/build.prop
+# (vendor_init context), and under enforcing the vendor copy would be dropped
+# without an avc line -- adb over USB would then run the nonblocking path
+# that cannot work on this kernel.
+ro.adb.nonblocking_ffs=false
