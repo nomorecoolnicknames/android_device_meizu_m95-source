@@ -12,6 +12,7 @@
 // VNDK note: manual declarations only, no libui linkage (cf. shims/gui.cpp).
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 #include <unistd.h>
 
 namespace android {
@@ -79,5 +80,34 @@ void _ZN7android5FenceD2Ev(M95Fence* self) {
     if (self && self->mFenceFd != -1) close(self->mFenceFd);
 }
 void _ZN7android5FenceD1Ev(M95Fence* self) { _ZN7android5FenceD2Ev(self); }
+
+}  // extern "C"
+
+// ---- String8::setPathName(const char*) -- gone from A13 libutils ----------
+// libui_ext.so (NEEDs this library first) and libcam.client.so import it, on
+// both ABIs; the VNDK v33 libutils exports String8::setTo but no setPathName
+// (nm, 2026-09-24), so hwcomposer.mt6797.so -> libui_ext.so could not load.
+// N body (system/core/libutils/String8.cpp): copy the name, drop ONE trailing
+// '/'. setTo(const char*, size_t) is still exported; manual declaration as
+// for the libui targets above.
+namespace android {
+class String8;
+}  // namespace android
+
+extern "C" {
+
+#ifdef __LP64__
+int _ZN7android7String85setToEPKcm(android::String8*, const char*, size_t);
+#define M95_STRING8_SETTO _ZN7android7String85setToEPKcm
+#else
+int _ZN7android7String85setToEPKcj(android::String8*, const char*, size_t);
+#define M95_STRING8_SETTO _ZN7android7String85setToEPKcj
+#endif
+
+void _ZN7android7String811setPathNameEPKc(android::String8* self, const char* name) {
+    size_t len = strlen(name);
+    if (len > 0 && name[len - 1] == '/') len--;
+    M95_STRING8_SETTO(self, name, len);
+}
 
 }  // extern "C"
