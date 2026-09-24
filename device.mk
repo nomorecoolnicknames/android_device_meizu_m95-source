@@ -66,9 +66,18 @@ PRODUCT_PACKAGES += \
 # libgui_vendor is an upstream AOSP 13 module (frameworks/native/libs/gui/
 # Android.bp:420, cc_library_shared + vendor: true); libsensor_vendor comes from
 # hardware/lineage/compat/Android.bp:383.  On 18.1 these had to be hand-added.
+#
+# The blobs do not NEED them by these names: they were rewired on 18.1 to
+# libgui_m95.so / libsensor_m95.so, and nothing provided those here (FACT,
+# staging vendor/ of 2026-09-16: 47 consumers, hwcomposer.mt6797.so among
+# them, would fail with `library "libgui_m95.so" not found`).  libgui_m95 and
+# libsensor_m95 are empty forwarders with DT_NEEDED on the real library
+# (shims/Android.bp explains why not a symlink or a second libgui).
 PRODUCT_PACKAGES += \
     libgui_vendor \
-    libsensor_vendor
+    libsensor_vendor \
+    libgui_m95 \
+    libsensor_m95
 
 # ---------------------------------------------------------------------------
 # Vendor shims (shims/Android.bp).  Per-symbol evidence in the 18.1 documents

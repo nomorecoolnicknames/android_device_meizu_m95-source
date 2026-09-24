@@ -18,6 +18,37 @@ cc_library_shared {
     allow_undefined_symbols: true,
 }
 
+// libgui_m95.so / libsensor_m95.so: the sonames the rewired N blobs NEED
+// (libgui_m95: 26 lib + 21 lib64 consumers -- hwcomposer.mt6797, libgui_ext,
+// libperfservice, camera, VoLTE; libsensor_m95: libmtkcam_sysutils,
+// libmpe.sensorlistener). On 18.1 these names were libgui_vendor and
+// libsensor_vendor themselves, renamed with `stem` inside frameworks/native
+// (18.1 commits 6a044e7, 4c9aeee). This tree ships libgui_vendor
+// (frameworks/native/libs/gui/Android.bp) and libsensor_vendor
+// (hardware/lineage/compat/Android.bp) under their own names, and a second
+// libgui cannot be built from here: libgui_defaults' srcs resolve against
+// THIS directory (build/soong/android/paths.go:1433-1447). So each is an
+// empty library whose only content is DT_NEEDED on the real one. bionic binds
+// every library against the whole breadth-first local group
+// (bionic/linker/linker.cpp:730-756, 1794-1810), so the consumers' symbols
+// land in the ONE libgui_vendor of the process. Soong links without
+// --as-needed, so the DT_NEEDED survives. Model check (meizu-fleet/tools/
+// m95_linkaudit.py, all 47 libgui_m95 consumers): the same 262 symbols bind
+// to libgui_vendor.so as with a symlink, one libgui instance per process.
+cc_library_shared {
+    name: "libgui_m95",
+    defaults: ["m95shim_defaults"],
+    srcs: ["stub.cpp"],
+    shared_libs: ["libgui_vendor"],
+}
+
+cc_library_shared {
+    name: "libsensor_m95",
+    defaults: ["m95shim_defaults"],
+    srcs: ["stub.cpp"],
+    shared_libs: ["libsensor_vendor"],
+}
+
 cc_library_shared {
     name: "libm95shim_power",
     defaults: ["m95shim_defaults"],
