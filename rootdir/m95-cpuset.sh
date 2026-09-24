@@ -141,8 +141,21 @@ sync_once() {
 # seconds, so a minute-long patrol would leave the sets narrow almost all the
 # time. Five seconds is cheap - the loop is a read, a handful of small writes
 # and a sleep - and keeps the sets wide for most of every interval.
+# LMK tiers of init.m95.mem.rc (GSI: FLYME13_KERNEL_PLAN.md:679-684). lmkd rewrites
+# the kernel params on every LMK_TARGET (lmkd.cpp:1431-1455), e.g. after a
+# system_server restart, and the boot_completed trigger fires only once
+# (M95_PERF_AUDIT_20260924.md P1-2).
+LMK_MINFREE=18432,23040,27648,32256,102400,122880
+LMK_PARAM=/sys/module/lowmemorykiller/parameters/minfree
+lmk_once() {
+    [ -w "$LMK_PARAM" ] || return 0
+    [ "$(cat "$LMK_PARAM" 2>/dev/null)" = "$LMK_MINFREE" ] && return 0
+    echo "$LMK_MINFREE" > "$LMK_PARAM" 2>/dev/null || true
+}
+
 while true; do
     sync_once
     thermal_once
+    lmk_once
     sleep 5
 done
