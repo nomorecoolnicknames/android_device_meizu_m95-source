@@ -139,3 +139,9 @@ debug.renderengine.backend=gles
 ro.opengles.version=196610
 # libEGL loads libGLES_mali.so by suffix (Loader.cpp) instead of directory scans.
 ro.hardware.egl=mali
+
+# Kernel 3.18 has no entry in any Android 13 framework compatibility matrix
+# (checkvintf: "No kernel entry found for kernel version 3.18"), so the boot-time
+# VINTF check always failed and showed the "internal problem" dialog.
+# frameworks/base meizu-legacy-vendor skips only the kernel part when this is set.
+ro.vendor.vintf.legacy_kernel=true
