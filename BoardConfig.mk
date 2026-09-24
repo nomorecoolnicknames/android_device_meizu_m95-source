@@ -326,6 +326,14 @@ SIM_COUNT := 2
 # too and have no librilimp module, so hardware/ril no longer reads it.
 BOARD_USES_MTK_HARDWARE := true
 BOARD_USES_MTK_LEGACY_RIL := true
+# Upstream hardware/ril ignores the flag and links rild against plain libril,
+# which builds fine and then cannot load mtk-ril.so.  PRODUCT_PACKAGES does not
+# catch that on this product (build/make/core/main.mk checks it only with
+# PRODUCT_ENFORCE_PACKAGES_EXIST, and BUILD_BROKEN_MISSING_REQUIRED_MODULES is
+# set above), so check for the branch itself.
+ifeq ($(wildcard hardware/ril/libril/librilmtk_force_needed.c),)
+$(error m95: hardware/ril is not on branch meizu-legacy-vendor (no libril/librilmtk_force_needed.c); rild would be built without librilmtk)
+endif
 
 # MTK gralloc0+fb module wrapped by the mapper@2.1 Gralloc0Hal adapter; the MTK
 # vendor usage bit 26 must be accepted (FACT, 16.0 camera fix).

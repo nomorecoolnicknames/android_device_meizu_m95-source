@@ -60,8 +60,9 @@ PRODUCT_PACKAGES += \
 # the 11 modem-internal symbols we do not implement.  64-bit only.  The module
 # comes from hardware/ril branch meizu-legacy-vendor under
 # BOARD_USES_MTK_LEGACY_RIL (BoardConfig.mk); rild would pull it in anyway,
-# naming it here makes a tree without that branch fail at build time instead
-# of shipping a rild that cannot load mtk-ril.so.
+# the name here documents the dependency.  It does NOT make a tree without
+# that branch fail (PRODUCT_ENFORCE_PACKAGES_EXIST is not set): the guard for
+# that is the $(error) next to the flag in BoardConfig.mk.
 PRODUCT_PACKAGES += \
     librilmtk
 
