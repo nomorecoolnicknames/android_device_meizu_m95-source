@@ -42,6 +42,23 @@ PRODUCT_SOONG_NAMESPACES += \
 PRODUCT_EXTRA_VNDK_VERSIONS := 30
 
 # ---------------------------------------------------------------------------
+# Vendor public libraries: the stock list plus libwfo_jni.so for ForgeImsService
+# (reasoning inside the file).  This line MUST stay above the inherit of
+# m95-vendor.mk: that makefile copies the stock file to the same destination,
+# and for PRODUCT_COPY_FILES the FIRST entry for a destination wins
+# (build/make/core/Makefile:70-89); an inherit-product expands in place, so
+# anything written below it comes after the vendor's own entry and is dropped
+# into product_copy_files_ignored.txt.
+#
+# Why the ImsService needs it: on 18.1 (VNDK-lite) the system default namespace
+# searched /vendor/${LIB}; Android 13 has no VNDK-lite (system/linkerconfig
+# main.cc:365), so without this entry loadLibrary("wfo_jni") fails with
+# "library not found" and MAL's ePDG entity never learns the SIM.
+# ---------------------------------------------------------------------------
+PRODUCT_COPY_FILES += \
+    $(LOCAL_PATH)/configs/public.libraries-vendor.txt:$(TARGET_COPY_OUT_VENDOR)/etc/public.libraries.txt
+
+# ---------------------------------------------------------------------------
 # Vendor blobs (real /vendor image on the `custom` partition)
 # ---------------------------------------------------------------------------
 $(call inherit-product, vendor/meizu/m95/m95-vendor.mk)
