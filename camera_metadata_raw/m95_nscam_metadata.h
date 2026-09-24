@@ -41,6 +41,14 @@
 
 namespace NSCam {
 
+// The vtables below mirror the blob's slot for slot, destructors included as
+// plain slots 0/1: a declared virtual destructor would be emitted by clang at
+// the same slots but with its own (different) semantics, and the objects are
+// never created or destroyed through these types here anyway. Soong builds
+// with -Werror=non-virtual-dtor, hence the scoped suppression.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wnon-virtual-dtor"
+
 typedef uint8_t MUINT8;
 typedef int32_t MINT32;
 typedef uint32_t MUINT32;
@@ -105,6 +113,8 @@ public:
 private:
     void* mImplementor;
 };
+
+#pragma clang diagnostic pop
 
 }  // namespace NSCam
 
