@@ -1023,4 +1023,11 @@ vendor/res/sound/testpattern1.wav
 #   vendor/lib/egl/libGLES_mali.so.orig, vendor/lib/libcam3_app.so.orig
 #       Pre-patch originals of byte-patched blobs, kept so the patch can be
 #       verified or reverted.  Never installed.
+#   vendor/etc/spn-conf.xml  (added 2026-09-24, after the count above)
+#       Stock /system/etc/spn-conf.xml, byte for byte (md5
+#       0abd67a9a39c6d7df5560c5eff591efd): MediaTek's PLMN -> network name
+#       table, 1109 codes.  Stock's framework read it from /system; here our
+#       libril reads it from /vendor to name the operator (hardware/ril branch
+#       meizu-legacy-vendor, "give OPERATOR real names").  Copied by
+#       m95-vendor-extra.mk.
 # ---------------------------------------------------------------------------
