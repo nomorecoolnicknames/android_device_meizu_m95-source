@@ -12,4 +12,6 @@
 # untrusted_app is included deliberately: any GLES game hits the same path;
 # isolated_app is not.
 # No allowxperm — see the kernel xperm defect note in ioctl_xperms.te.
+# 2026-09-24: superseded -- on Android 13 the command list is mandatory; it
+# is granted for apps too in the bottom block of graphics.te.
 allow { appdomain -isolated_app } proc_ged:file { getattr open read ioctl };
