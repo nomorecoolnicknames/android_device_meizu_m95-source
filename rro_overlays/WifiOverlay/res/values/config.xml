@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- No randomized hotspot BSSID. With randomization on, SoftApManager sets a
+         BSSID and fails the start (ERROR_GENERIC) if setApMacAddress fails
+         (packages/modules/Wifi/.../SoftApManager.java:650-655). The ap0
+         netdev's ndo_set_mac_address is a bare eth_mac_addr marked @FIXME
+         (wlan/gen3 gl_p2p.c:2016-2030): -EBUSY while the interface is up, and
+         when it does succeed only the netdev address changes, not the MAC the
+         firmware beacons with. Off, SoftApManager keeps the factory MAC and
+         treats a failed reset as non-fatal (:643-649). -->
+    <bool translatable="false" name="config_wifi_ap_mac_randomization_supported">false</bool>
+</resources>

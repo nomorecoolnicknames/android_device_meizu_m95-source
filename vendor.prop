@@ -70,6 +70,12 @@ ro.mtk_pq_color_mode=1
 # Wi-Fi: never pin BSSID (FACT: MTK gen3 cannot join fixed-BSSID, A/B 2026-08-14).
 ro.vendor.wifi.connect_ssid_only=1
 
+# Hotspot interface: in AP mode ('A' on /dev/wmtWifi, see BoardConfig.mk) the
+# MTK driver registers ap0, not wlanN. The wifi HAL hands this name to wificond
+# and hostapd instead of wlan0 (hardware/interfaces/wifi/1.6/default/
+# wifi_chip.cpp:108-124, 1975-1981).
+ro.vendor.wifi.sap.interface=ap0
+
 # MtkCam log gate: level 0 (FACT: level 3 starves 3A by ~280 frames).
 persist.mtk.camera.log_level=0
 

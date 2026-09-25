@@ -370,6 +370,12 @@ PRODUCT_PACKAGES += \
     wpa_supplicant \
     libwpa_client
 
+# Hotspot: ap0 as a tetherable Wi-Fi interface, no randomized AP BSSID
+# (rro_overlays/*/res/values/config.xml say why).
+PRODUCT_PACKAGES += \
+    M95TetheringConfigOverlay \
+    M95WifiOverlay
+
 PRODUCT_COPY_FILES += \
     external/wpa_supplicant_8/wpa_supplicant/wpa_supplicant_template.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant.conf
 
