@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The MTK driver's hotspot interface is ap0 (wlan/gen3 gl_p2p_init.c:30,
+         ro.vendor.wifi.sap.interface). The module default matches only
+         wlan\d, softap\d and the bridged ap_br_* names, so without ap\d the
+         hotspot comes up but is never tethered: no DHCP, no NAT. The defaults
+         are kept. -->
+    <string-array translatable="false" name="config_tether_wifi_regexs">
+        <item>"wlan\\d"</item>
+        <item>"ap\\d"</item>
+        <item>"softap\\d"</item>
+        <item>"ap_br_wlan\\d"</item>
+        <item>"ap_br_softap\\d"</item>
+    </string-array>
+</resources>

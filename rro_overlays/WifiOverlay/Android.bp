@@ -1,0 +1,8 @@
+// Overlay for the Wi-Fi mainline resources (com.android.wifi.resources,
+// overlayable "WifiCustomization", vendor allowed).
+runtime_resource_overlay {
+    name: "M95WifiOverlay",
+    resource_dirs: ["res"],
+    vendor: true,
+    sdk_version: "current",
+}

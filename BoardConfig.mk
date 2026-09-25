@@ -305,6 +305,19 @@ BOARD_HOSTAPD_PRIVATE_LIB := lib_driver_cmd_mt66xx
 WIFI_DRIVER_STATE_CTRL_PARAM := /dev/wmtWifi
 WIFI_DRIVER_STATE_ON := 1
 WIFI_DRIVER_STATE_OFF := 0
+# Hotspot. The wifi HAL switches chip mode (STA+P2P <-> AP) through
+# DriverTool::ChangeFirmwareMode, which writes these strings to
+# WIFI_DRIVER_FW_PATH_PARAM; left unset, the switch is a silent no-op
+# (frameworks/opt/net/wifi/libwifi_hal/driver_tool.cpp:50-54) and hostapd is
+# handed wlan0 with the driver still in STA mode. The WMT char device acts on
+# the first letter: 'A' puts the gen3 driver in AP mode and registers ap0,
+# 'S'/'P' return to STA mode and register p2p0 (kernel conn_soc
+# wmt_chrdev_wifi.c:444-545, wlan/gen3 gl_p2p_init.c:30). Never set on 16.0 or
+# 18.1 either. The AP interface name is ro.vendor.wifi.sap.interface.
+WIFI_DRIVER_FW_PATH_PARAM := /dev/wmtWifi
+WIFI_DRIVER_FW_PATH_STA := STA
+WIFI_DRIVER_FW_PATH_AP := AP
+WIFI_DRIVER_FW_PATH_P2P := P2P
 # The MT6797 gen3 driver rejects SIOCSIFHWADDR and the default wifi HAL would
 # leave wlan0 DOWN after the failed MAC change (Android 13 asks for one on every
 # enable/connect) -> no scan, no association.  FACT 2026-09-12.

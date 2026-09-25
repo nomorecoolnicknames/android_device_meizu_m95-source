@@ -1,0 +1,10 @@
+// Tethering reads its interface regexes from its own package
+// (packages/modules/Connectivity/Tethering/src/.../TetheringConfiguration.java:183),
+// so a framework-res overlay has no effect on A13. Overlayable "TetheringConfig"
+// allows vendor overlays (res/values/overlayable.xml:17-18).
+runtime_resource_overlay {
+    name: "M95TetheringConfigOverlay",
+    resource_dirs: ["res"],
+    vendor: true,
+    sdk_version: "current",
+}
