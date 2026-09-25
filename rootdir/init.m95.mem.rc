@@ -6,6 +6,16 @@
 #  ActivityManager (ProcessList.updateOomLevels -> sys.lmk.minfree_levels -> lmkd)
 #  rewrites the kernel param during boot, so the write has to come after
 #  sys.boot_completed as well (FACT: post-fs-data write alone was overridden).
+
+# Kernel 3.18 prints a full register dump (do_ni_syscall + Code:) for every
+# unknown syscall; A13 userspace hits them routinely (system_server:
+# "syscall 291" = statx, absent before 4.11 -- FACT, b16 dmesg, noted by the
+# kernel-perf lane). The dumps are rate-limited but go through printk on the
+# boot path. The syscalls still fail with ENOSYS exactly as before; only the
+# dump is suppressed.
+on early-init
+    write /proc/sys/debug/exception-trace 0
+
 on post-fs-data
     swapon_all /vendor/etc/fstab.mt6797
     # zram 2 GiB (Brawl Stars alone is ~1 GB resident; 1 GiB filled up, 214% iowait,
