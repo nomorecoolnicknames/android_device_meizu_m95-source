@@ -1,5 +1,6 @@
-// The library that answers MediaTek's dlsym for the IMX386 stream table and
-// appends the RAW16 4032x3016 row to the vendor's own copy of it. See
+// The library that answers MediaTek's dlsym for the IMX386 and OV5695 stream
+// tables and appends rows to the vendor's own copy of them: RAW16 4032x3016 on
+// the rear, 4:3 YUV viewfinder sizes on both. See
 // m95_scaler_raw.cpp for why, and TARGET_LD_SHIM_LIBS in BoardConfig.mk for
 // how it gets into the provider.
 //

@@ -133,6 +133,16 @@ persist.camera.raw_front=1
 # provider restart. The front sensor is not touched here.
 persist.camera.raw=1
 
+# 4:3 viewfinder sizes for both cameras: libm95_camera_metadata_raw appends
+# YCbCr_420_888 1440x1080 and 1280x960 (30 fps, no stall) to the vendor stream
+# table, and MetadataProvider::updateData copies every YUV output row into
+# IMPLEMENTATION_DEFINED and YV12 rows afterwards (metastore 0x4312e). FACT
+# (LOS20 build 18, dumpsys 2026-09-25): without them the largest 4:3 PRIVATE
+# size is 640x480, which Google Camera stretches over the screen. 1440x1080 is
+# the stock HAL1 preview (CAMERA_PREVIEW_WIDTH_TRIAGE.md, wdmao-1440x1080).
+# 0 (or unset) drops the rows after a provider restart.
+persist.camera.preview_43=1
+
 # Log suppression for known blob floods (FACT, measured on device).
 log.tag.AudioParamParser=S
 log.tag.SensorHAL=I
