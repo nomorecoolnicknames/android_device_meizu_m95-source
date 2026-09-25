@@ -131,6 +131,7 @@ PRODUCT_PACKAGES += \
     libm95shim_sf \
     libm95shim_nparcel \
     libm95shim_net \
+    libm95shim_netd_client \
     libm95shim_region \
     libm95shim_fs_mgr \
     libm95shim_skia \

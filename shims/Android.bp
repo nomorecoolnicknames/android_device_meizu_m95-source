@@ -133,6 +133,20 @@ cc_library_shared {
     srcs: ["net.c"],
 }
 
+// libnetd_client.so — setNetworkForSocket for volte_stack (and wfca), forwarded
+// to the LLNDK android_setsocknetwork (see netd_client.c). Without it
+// volte_stack cannot link, and volte_ua / volte_imcb exit 245 waiting for its
+// socket (capture m95-b19-volte-20260925). ELF32 only: every consumer of this
+// symbol is 32-bit; the 64-bit one (lib64/libcharon.so) wants protectFromVpn.
+cc_library_shared {
+    name: "libm95shim_netd_client",
+    defaults: ["m95shim_defaults"],
+    stem: "libnetd_client",
+    srcs: ["netd_client.c"],
+    shared_libs: ["libandroid_net"],
+    compile_multilib: "32",
+}
+
 // libm95probe is NOT linked by anything at build time; blobs get it via
 // patchelf --add-needed (vendor-18.1/wire-shims.py). Loaded for its
 // constructor side effect only (dlopen proof without logd).
