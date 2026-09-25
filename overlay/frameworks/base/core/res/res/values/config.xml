@@ -1,9 +1,76 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     Meizu MX6 (m95) — framework overlay, LineageOS 18.1 (Android 11).
-    Пока здесь только гейт платформы VoLTE.
+    Здесь гейт платформы VoLTE и автояркость.
 -->
 <resources>
+    <!-- Автояркость. Датчик света — Rohm BH1745 (i2c 1-0038, /dev/input/event4,
+         ABS_MISC = lux, 0…65535, BH1745_driver.c:794,861); в списке датчиков он
+         под именем блоба "apds9922 light sensor". Отсчёты доходят до фреймворка
+         только при gid input у sensors@1.0-service (rootdir/init.m95.sensors.rc).
+
+         Кривая — стоковая, из framework-res.apk Flyme 8.0.5.0A (MX6, 7.1.1):
+         стоковая прошивка читала lux тем же sensors.alsps.so с тем же драйвером,
+         так что ось lux в тех же единицах. Кривая 16.0 (5…8000 lux →
+         8…255) была перенесена с m681 и под bh1745 не калибровалась.
+         Оговорка: заводской масштаб als_calibration (lux·scale/10) у нас никто не
+         пишет (als_calibbias = "0-cali fail"), lux идёт сырой; если сток его
+         писал, наша ось смещена на этот множитель.
+
+         A13 без таблицы nits панели берёт SimpleMappingStrategy
+         (BrightnessMappingStrategy.java:152-154): к уровням неявно добавляется
+         точка 0 lux, поэтому значений подсветки на одно больше (21 → 22). -->
+    <bool name="config_automatic_brightness_available">true</bool>
+
+    <integer-array name="config_autoBrightnessLevels">
+        <item>2</item>
+        <item>10</item>
+        <item>20</item>
+        <item>25</item>
+        <item>40</item>
+        <item>50</item>
+        <item>60</item>
+        <item>85</item>
+        <item>110</item>
+        <item>128</item>
+        <item>256</item>
+        <item>384</item>
+        <item>512</item>
+        <item>640</item>
+        <item>768</item>
+        <item>896</item>
+        <item>1024</item>
+        <item>2048</item>
+        <item>4096</item>
+        <item>6144</item>
+        <item>8192</item>
+    </integer-array>
+
+    <integer-array name="config_autoBrightnessLcdBacklightValues">
+        <item>67</item>
+        <item>70</item>
+        <item>73</item>
+        <item>75</item>
+        <item>77</item>
+        <item>80</item>
+        <item>83</item>
+        <item>85</item>
+        <item>87</item>
+        <item>90</item>
+        <item>95</item>
+        <item>100</item>
+        <item>107</item>
+        <item>115</item>
+        <item>128</item>
+        <item>139</item>
+        <item>150</item>
+        <item>170</item>
+        <item>180</item>
+        <item>200</item>
+        <item>240</item>
+        <item>255</item>
+    </integer-array>
+
     <!-- Вторая половина конъюнкции в ImsManager.isVolteEnabledByPlatform():
          persist.dbg.volte_avail_ovr (system.prop) закорачивает проверку раньше,
          но при снятом оверрайде платформенный гейт обязан быть верным.
