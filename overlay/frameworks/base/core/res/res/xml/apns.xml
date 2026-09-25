@@ -46,6 +46,10 @@
         mImsMmTelRegistrationState=0 при LTE). Проверка — setupDataCall apn=ims,
         +CIREGU: 1,1. Если сеть или модем MTK (белый список VoLTE по оператору)
         не пустит — строки безвредны: IMS просто не зарегистрируется.
+        МТС — FACT 2026-09-26 на №23 (строка apn=ims/IP вставлена в БД вручную):
+        IMS PDN поднят (QCI 5, P-CSCF из PCO), REGISTER → 401 AKA → 200 OK
+        (meizu-fleet/BRINGUP_STATE.md, запись 01:05–01:25). Tele2 и T-Mobile —
+        по-прежнему HYPOTHESIS.
     -->
     <apn carrier="MTS IMS"
          mcc="250"
