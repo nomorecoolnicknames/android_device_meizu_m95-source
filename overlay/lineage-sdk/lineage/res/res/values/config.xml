@@ -28,4 +28,36 @@
          NOTE: this is a system-image resource (org.lineageos.platform-res).
          It has no effect until system.img is rebuilt and flashed. -->
     <integer name="config_deviceLightCapabilities">72</integer>
+
+    <!-- mBack. PhoneWindowManager reads the three key resources below from
+         org.lineageos.platform.internal.R, so they belong in this overlay and
+         would be ignored under overlay/frameworks/base.
+
+         Physical key -> node -> keycode (FACT, 16.0 analysis, keylayouts here):
+           press (dome click) : PMIC HOMEKEY, scan 102 on "mtk-kpd" -> HOME
+           tap (mTouch)       : Goodix daemon ioctl, KEY_BACK 158 on "fp-keys"
+                                -> BACK, only for a touch shorter than 1000 ms
+           hold (dome held)   : the same HOME, long press
+
+         Hardware keys present: 1 Home | 2 Back | 64 Volume = 67. The
+         lineage-sdk default is 64 (volume only); with it LineageParts hides the
+         Settings > Buttons > Home category, so the long-press action below
+         cannot be changed from the UI. -->
+    <integer name="config_deviceHardwareKeys">67</integer>
+
+    <!-- Keys allowed to wake the screen: 1 Home | 64 Volume = 65. Back is left
+         out on purpose: a capacitive tap must not wake the phone in a pocket.
+         Gate: PhoneWindowManager.java:2910-2912 (mWakeOnHomeKeyPress). -->
+    <integer name="config_deviceHardwareWakeKeys">65</integer>
+
+    <!-- Hold mBack = recent apps. The lineage-sdk default is 3 (Action.SEARCH
+         -> launchAssistAction); this build has no assistant
+         (settings secure assistant is empty), so a held mBack gave the
+         long-press haptic and nothing else. 2 = Action.APP_SWITCH ->
+         toggleRecentApps() (PhoneWindowManager.java:2004-2005), and it also
+         preloads recents on key-down (:2142-2145).
+         config_doubleTapOnHomeBehavior stays at the default 0: any other value
+         defers every single press by the double-tap timeout (:2099-2106), which
+         would add lag to "press = Home". -->
+    <integer name="config_longPressOnHomeBehavior">2</integer>
 </resources>
