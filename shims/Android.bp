@@ -75,7 +75,13 @@ cc_library_shared {
     defaults: ["m95shim_defaults"],
     srcs: ["ui.cpp"],
     // Manual declarations only (see gui.cpp): N-ABI entries defined here,
-    // R-ABI targets resolved at runtime under VNDK-lite.
+    // R-ABI targets resolved at runtime under VNDK-lite. libsync/liblog are
+    // LLNDK (Fence waits and logs); libui is reached with dlsym, not linked.
+    shared_libs: [
+        "libdl",
+        "liblog",
+        "libsync",
+    ],
     allow_undefined_symbols: true,
 }
 
