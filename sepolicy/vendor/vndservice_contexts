@@ -1,0 +1,12 @@
+# vndservice_contexts -- Meizu MX6 (m95), Android 13.
+#
+# Services MTK vendor daemons register with vndservicemanager (/dev/vndbinder).
+# Before this file existed every one of them fell through to
+# default_android_vndservice, whose { add } A13 grants nobody
+# (public/domain.te: no add for default service labels). Names are the exact
+# strings from the denials of capture m95-boot-20260924-192234.
+
+android.hardware.fingerprint.IGoodixFingerprintDaemon  u:object_r:goodixfpd_vndservice:s0
+NvRAMAgent                                             u:object_r:nvram_agent_vndservice:s0
+GuiExtService                                          u:object_r:guiext_vndservice:s0
+PQ                                                     u:object_r:pq_vndservice:s0

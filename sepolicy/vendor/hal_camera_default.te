@@ -257,3 +257,11 @@ binder_call(hal_camera_default, system_server)
 # effect. This grants the socket connect; whichever property it then sets will
 # surface as its own { set } denial and gets a labelled type, never default_prop.
 unix_socket_connect(hal_camera_default, property, init)
+
+# 2026-09-24 (A13): the 3A threads raise their own priority. FACT (192234):
+# denied { sys_nice } capability=23 comm=AESenThd / 3ATHREAD.
+allow hal_camera_default self:global_capability_class_set sys_nice;
+
+# 2026-09-25 (A13): persist.camera.* switches of the provider and of
+# libm95_camera_metadata_raw (property.te m95_camera_prop).
+get_prop(hal_camera_default, m95_camera_prop)

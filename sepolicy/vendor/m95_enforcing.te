@@ -412,7 +412,10 @@ set_prop(rild, mtk_md_prop)
 allow rild block_device:dir search;
 
 # ccci_mdinit publishes modem status for the framework.
-set_prop(ccci_mdinit, net_radio_prop)
+# 2026-09-24 (A13): set_prop(ccci_mdinit, net_radio_prop) removed -- a
+# neverallow on A13 (public/property.te:101, private/property.te:57/162).
+# The one name it sets there, net.cdma.mdmstat, is relabelled mtk_md_prop in
+# property_contexts; ccci_mdinit already sets that type (modem_daemons.te).
 
 # vendor_init tries to apply the dexopt policy out of /vendor/build.prop and is
 # refused. domain.te:547 neverallows it, and unlike the WMT case this one is

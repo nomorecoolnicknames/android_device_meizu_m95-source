@@ -346,28 +346,27 @@ TARGET_OTA_ASSERT_DEVICE := m95,M95,m685,MX6,mx6
 include vendor/meizu/m95/BoardConfigVendor.mk
 
 # ---------------------------------------------------------------------------
-# SELinux: neverallow-проверки отключены на время подъёма
+# SELinux: neverallow-проверки ВКЛЮЧЕНЫ (2026-09-24, SELinux-лейн)
 # ---------------------------------------------------------------------------
-# Android 13 ужесточил правила, и блобы эпохи Nougat их нарушают. secilc
-# (прогон 6, 2026-09-16) назвал ровно четыре нарушения:
+# До этого здесь стоял SELINUX_IGNORE_NEVERALLOWS := true с «четырьмя»
+# нарушениями. Хостовый прогон того же конвейера (m4 -> checkpolicy ->
+# version_policy -> secilc, бинарник байт-в-байт равен precompiled_sepolicy
+# сборки 16.09) показал больше: secilc -- 11 neverallow (включая 54 правила
+# enforce_sysprop_owner), эмуляция sepolicy_neverallows_vendor (вариант
+# user) -- 196. Все сняты в sepolicy/vendor (свойства через
+# vendor_*_prop и переразметку, goodixfpd, и т.д.), разбор --
+# meizu-fleet/designs/M95_SEPOLICY_LOS20_20260924.md.
 #
-#   1. allow ccci_mdinit net_radio_prop_33_0 (property_service set)
-#      neverallow: plat_pub_versioned.cil:9821
-#   2. allow shell_33_0 m95_forge_prop (property_service set)
-#      neverallow: private/property.te:324
-#   3. allow m95_bdaddr bluetooth_prop_33_0 (file read getattr map open)
-#      neverallow: private/property.te:162
-#   4. allow ccci_mdinit radio_prop_33_0 (file read getattr map open)
-#      neverallow: private/property.te:162
-#
-# ТЕХНИЧЕСКИЙ ДОЛГ, а не решение. Правильный путь по каждому пункту — завести
-# вендорный тип свойства и переразметить его в property_contexts, а не давать
-# вендорному домену доступ к системному. Пункт 2 (shell) — самый неприятный:
-# он означает, что свойство m95_forge_prop сейчас доступно из adb shell.
-#
-# Соседние деревья флота (m5c BoardConfig.mk:257, m681 BoardConfig.mk:315)
-# держат тот же флаг по той же причине.
-SELINUX_IGNORE_NEVERALLOWS := true
+# На хосте проверено: secilc без -N rc=0; sepolicy_neverallows_vendor
+# (checkpolicy) rc=0; sepolicy_tests.py rc=0; treble_sepolicy_tests
+# CoredomainViolations/ViolatorAttributes/CoreDatatypeViolations rc=0
+# (--fake-treble, т.к. PRODUCT_FULL_TREBLE_OVERRIDE := true); checkfc по
+# file/property/vndservice_contexts OK.
+# НЕ проверено на хосте: treble_sepolicy_tests TrebleCompatMapping (нужны
+# старые плат-политики 28..32), sepolicy-analyze и sepolicy_compat_test.
+# Если сборка упадёт именно на них -- вернуть строку ниже этим же коммитом
+# (git revert), а не глушить отдельные правила.
+# SELINUX_IGNORE_NEVERALLOWS := true
 
 # Camera RAW16: libm95_camera_metadata_raw must be global in the camera provider
 # before MediaTek's metadata store asks dlsym(RTLD_DEFAULT) for the IMX386 stream

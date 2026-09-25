@@ -1,27 +1,46 @@
-# Goodix fingerprint daemon — /system/bin/goodixfingerprintd.
+# Goodix fingerprint daemon -- /vendor/bin/goodixfingerprintd.
 #
-# No new domain is declared here. Pie still ships the legacy fingerprintd
-# domain (system/sepolicy/public/fingerprintd.te declares `fingerprintd` and
-# `fingerprintd_exec`; private/fingerprintd.te makes it coredomain and calls
-# init_daemon_domain), and it already grants binder_use, use_keystore,
-# add_auth on keystore keys, fingerprintd_data_file, permission_service:find
-# and ion_device — the full set a legacy fingerprint daemon needs. goodixfpd.rc
-# pins the daemon into it with `seclabel u:r:fingerprintd:s0`, and
-# sepolicy/file_contexts labels the binary fingerprintd_exec so the entrypoint
-# check passes under enforcing. Same shape as device/meizu/m681/sepolicy.
+# 2026-09-24 (Android 13, SELinux lane): the daemon has a VENDOR domain of its
+# own, goodixfpd, instead of the platform `fingerprintd` it was pinned into by
+# `seclabel` since LOS16. fingerprintd is a coredomain (private/
+# fingerprintd.te), fingerprintd_exec is system_file_type, and a coredomain
+# may not execute /vendor files (public/domain.te, full_treble_only), so no
+# rule could make that pairing legal -- the blocker SELINUX_ENFORCING_PLAN.md
+# §4.2 recorded on 18.1. FACT (both captures), scontext=fingerprintd:
+#   { entrypoint } path=/vendor/bin/goodixfingerprintd tcontext=vendor_file
+#   { execute open read } libgf_hal.so (vendor_file), libm95shim_utils.so
+#   (same_process_hal_file), libbinder.so (113630, before 8d35fea)
+#   { open read write ioctl } /dev/vndbinder, { call transfer } vndservicemanager
+#   { add } android.hardware.fingerprint.IGoodixFingerprintDaemon on
+#   default_android_vndservice
+# and, from the HAL side, hal_fingerprint_default { find } on the same name,
+# vndbinder and a vndservicemanager call. On A13 the daemon links the VNDK
+# libbinder, so its ProcessState is /dev/vndbinder and the service lives in
+# vndservicemanager -- the Treble-correct vendor-to-vendor shape.
+# Under enforcing before this change the daemon did not start at all.
 #
-# Everything below is what the platform domain does NOT already cover.
+# goodixfpd.rc drops its seclabel line; the exec label does the transition.
+# No keystore: the binary carries no keystore strings, auth tokens travel
+# HAL -> framework.
+
+type goodixfpd, domain;
+type goodixfpd_exec, exec_type, vendor_file_type, file_type;
+init_daemon_domain(goodixfpd)
+
+vndbinder_use(goodixfpd)
+add_service(goodixfpd, goodixfpd_vndservice)
+
+vndbinder_use(hal_fingerprint_default)
+allow hal_fingerprint_default goodixfpd_vndservice:service_manager find;
 
 ##########################
-# The binder service the daemon publishes. fingerprint.default.so (dlopened by
-# the @2.0-service, i.e. hal_fingerprint_default) is the only client.
-allow fingerprintd goodixfingerprintd_service:service_manager { add find };
-allow hal_fingerprint goodixfingerprintd_service:service_manager find;
+# fingerprint.default.so (dlopened by the @2.0-service, i.e.
+# hal_fingerprint_default) is the only client of the daemon's service.
 
 # IGoodixFingerprintDaemonCallback means traffic runs both ways: the HAL calls
 # in to enroll/authenticate, the daemon calls back with results.
-binder_call(hal_fingerprint, fingerprintd)
-binder_call(fingerprintd, hal_fingerprint)
+binder_call(hal_fingerprint, goodixfpd)
+binder_call(goodixfpd, hal_fingerprint)
 
 ##########################
 # Sensor + TEE. /dev/goodix_fp is 230,0 system:system 0660, labelled
@@ -29,28 +48,26 @@ binder_call(fingerprintd, hal_fingerprint)
 # The daemon opens it directly and drives the sensor through libgf_hal; it is
 # also the only writer of GF_IOC_INPUT_KEY_EVENT, which is what turns an mBack
 # tap into KEY_BACK on the fp-keys input node (see keylayout/fp-keys.kl).
-allow fingerprintd fingerprint_device:chr_file rw_file_perms;
+allow goodixfpd fingerprint_device:chr_file rw_file_perms;
 
 # Crypto path: libgf_ca -> libMcClient -> /dev/mobicore-user + the mcd socket.
 # Identical to the chain live keymaster@3.0 and gatekeeper@1.0 already use
 # (see sepolicy/tee.te).
-allow fingerprintd mobicore_user_device:chr_file rw_file_perms;
-allow fingerprintd mcd:unix_stream_socket connectto;
-r_dir_file(fingerprintd, mcd_data_file)
+allow goodixfpd mobicore_user_device:chr_file rw_file_perms;
+allow goodixfpd mcd:unix_stream_socket connectto;
+r_dir_file(goodixfpd, mcd_data_file)
 
 ##########################
 # Template / calibration store. FACT: proprietary/lib64/libgf_hal.so contains
 # /data/gf_data/{authenticate,base/finger_base,base/nav_base,consistency,
 # enroll,navigation,test_sensor}/ as literals. goodixfpd.rc creates the root
 # 0700 system system; the daemon creates the subtree itself.
-allow fingerprintd gf_data_file:dir create_dir_perms;
-allow fingerprintd gf_data_file:file create_file_perms;
+allow goodixfpd gf_data_file:dir create_dir_perms;
+allow goodixfpd gf_data_file:file create_file_perms;
 
 ##########################
 # Self-binder (the daemon hands binder objects to its own callback thread) and
 # property_service, which the daemon reaches through init's socket.
-allow fingerprintd self:binder { call transfer };
-allow fingerprintd init:unix_stream_socket connectto;
 
 ##########################
 # Netlink socket to the Goodix driver — this is the finger-touch path itself.
@@ -72,7 +89,7 @@ allow fingerprintd init:unix_stream_socket connectto;
 # Same class of latent-under-permissive defect as the LSC shading cache and the
 # akmd_set.txt calibration store: invisible now, fatal at the moment enforcing
 # is switched on, which is exactly when nobody is looking for it.
-allow fingerprintd self:netlink_socket { create bind read write setopt };
+allow goodixfpd self:netlink_socket { create bind read write setopt };
 
 ##########################
 # 2026-08-14 census: the LOS @2.0 HAL service (not the goodix daemon) writes

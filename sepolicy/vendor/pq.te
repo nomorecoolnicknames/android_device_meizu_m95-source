@@ -50,3 +50,14 @@ allow hal_camera_default pq_service:service_manager find;
 allow surfaceflinger pq_service:service_manager find;
 allow system_app pq_service:service_manager find;
 allow platform_app pq_service:service_manager find;
+
+# 2026-09-24 (A13). FACT (192234): mediacodec { find } name=PQ on
+# default_android_vndservice -- the MTK codec looks PQ up on /dev/vndbinder.
+# pq did not run in that boot (it is gated by persist.m95.pq.enable), so its
+# side is inferred from the client: the daemon links the VNDK libbinder and
+# therefore registers where mediacodec looks. The camera provider call to pq
+# was observed on 16.0 (m95_enforcing.te round 17).
+vndbinder_use(pq)
+add_service(pq, pq_vndservice)
+allow { mediacodec hal_camera_default } pq_vndservice:service_manager find;
+binder_call({ mediacodec hal_camera_default }, pq)

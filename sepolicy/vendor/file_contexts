@@ -225,6 +225,9 @@
 # of its own -- full recipe in SELINUX_ENFORCING_PLAN.md §4.2. Under enforcing
 # as it stands today the daemon does not start and the fingerprint dies, so
 # this is a hard blocker, not a cosmetic one.
+# 2026-09-24 (A13): resolved -- the daemon has its vendor domain goodixfpd
+# (fingerprintd.te) and is labelled below.
+/(vendor|system/vendor)/bin/goodixfingerprintd  u:object_r:goodixfpd_exec:s0
 
 ##########################
 # Vendor executables (installed under /system/vendor in this semi-treble
@@ -405,7 +408,57 @@
 /(vendor|system/vendor)/lib(64)?/libm95shim_utils\.so   u:object_r:same_process_hal_file:s0
 /(vendor|system/vendor)/lib(64)?/libm95probe\.so        u:object_r:same_process_hal_file:s0
 
+# 2026-09-24 (Android 13, SELinux lane): the closure above was one link short.
+# libgpu_aux.so now pulls libdpframework.so, and through it the MDP/PQ/codec
+# helpers below. FACT (capture m95-boot-20260924-192234, dmesg): zygote,
+# surfaceflinger and bootanim take { execute } / { open read getattr } on
+# vendor_file for /vendor/lib{,64}/libdpframework.so, libbwc.so, libm4u.so,
+# libpq_prot.so and /vendor/lib/libstdc++.so. The kernel audits a
+# (domain, vendor_file, file, perm) tuple once per boot, so the log names only
+# the first library per permission; the full set is the readelf DT_NEEDED
+# closure of egl/libGLES_mali.so + hw/gralloc.mt6797.so on the built /vendor
+# (64- and 32-bit). Under enforcing any one of them missing means no EGL in
+# zygote, surfaceflinger or bootanim.
+/(vendor|system/vendor)/lib(64)?/libdpframework\.so      u:object_r:same_process_hal_file:s0
+/(vendor|system/vendor)/lib(64)?/libbwc\.so              u:object_r:same_process_hal_file:s0
+/(vendor|system/vendor)/lib(64)?/libm4u\.so              u:object_r:same_process_hal_file:s0
+/(vendor|system/vendor)/lib(64)?/libmtk_drvb\.so         u:object_r:same_process_hal_file:s0
+/(vendor|system/vendor)/lib(64)?/libpq_prot\.so          u:object_r:same_process_hal_file:s0
+/(vendor|system/vendor)/lib(64)?/libpqservice\.so        u:object_r:same_process_hal_file:s0
+/(vendor|system/vendor)/lib(64)?/libvcodec_utility\.so   u:object_r:same_process_hal_file:s0
+/(vendor|system/vendor)/lib(64)?/libvcodecdrv\.so        u:object_r:same_process_hal_file:s0
+/(vendor|system/vendor)/lib(64)?/libvcodec_oal\.so       u:object_r:same_process_hal_file:s0
+/(vendor|system/vendor)/lib(64)?/libmp4enc_sa\.ca7\.so   u:object_r:same_process_hal_file:s0
+/(vendor|system/vendor)/lib(64)?/libvc1dec_sa\.ca7\.so   u:object_r:same_process_hal_file:s0
+/(vendor|system/vendor)/lib(64)?/libvp8dec_sa\.ca7\.so   u:object_r:same_process_hal_file:s0
+/(vendor|system/vendor)/lib(64)?/libstdc\+\+\.so          u:object_r:same_process_hal_file:s0
+/(vendor|system/vendor)/lib(64)?/libnetutils\.so         u:object_r:same_process_hal_file:s0
+
 # A13 GSI (FACT 2026-09-11): the AOSP regex covers only ...-service, not the
 # .software variant this device installs; unlabeled -> init refuses to start it
 # -> LockSettingsService NPE on IGateKeeper.
 /(vendor|system/vendor)/bin/hw/android\.hardware\.gatekeeper@1\.0-service\.software  u:object_r:hal_gatekeeper_default_exec:s0
+
+##########################
+# 2026-09-24 (Android 13, SELinux lane).
+
+# HIDL clearkey. A13's system/sepolicy/vendor/file_contexts:36 labels only the
+# AIDL android.hardware.drm-service.clearkey; the @1.4 HIDL binary this build
+# still installs stayed vendor_file, so init ran it in its own domain. FACT
+# (both captures): "File /vendor/bin/hw/android.hardware.drm@1.4-service.
+# clearkey (labeled "u:object_r:vendor_file:s0") has incorrect label or no
+# domain transition" x26, and init itself adding IDrmFactory to
+# hwservicemanager. Under enforcing init refuses to start it
+# (system/core/init/service.cpp:97). hal_drm_default is the A13 domain for
+# HIDL DRM factories and already serves hal_drm_hwservice.
+/(vendor|system/vendor)/bin/hw/android\.hardware\.drm@1\.4-service\.clearkey  u:object_r:hal_drm_default_exec:s0
+
+# zram. The plat label is ram_device (private/file_contexts:87), which A13
+# gives neither init (swapon) nor toolbox (mkswap); swap_block_device is the
+# type both hold rights on. FACT (both captures): denied { write } zram0
+# scontext=init and { read write open ioctl getattr } comm=mkswap
+# scontext=toolbox, tcontext=ram_device. Under enforcing: no zram swap.
+/dev/block/zram0        u:object_r:swap_block_device:s0
+
+# Modem config store (file.te ccci_cfg_file).
+/data/ccci_cfg(/.*)?    u:object_r:ccci_cfg_file:s0

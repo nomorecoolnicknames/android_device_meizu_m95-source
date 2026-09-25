@@ -1,0 +1,8 @@
+# Vibrator HAL -- device extras (LineageOS common vendor policy adds only
+# hwbinder_use).
+#
+# FACT (113630): denied { search } name=leds tcontext=sysfs_leds
+# scontext=hal_vibrator_default -- the @1.0 legacy module reaches its node
+# through /sys/class/leds. Search only; the node it then writes produced no
+# denial.
+allow hal_vibrator_default sysfs_leds:dir search;

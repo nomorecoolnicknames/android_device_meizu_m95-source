@@ -197,3 +197,35 @@ type proc_hps, fs_type, proc_type;
 type volte_stack_socket, file_type;
 type volte_ua_socket, file_type;
 type volte_imcb_socket, file_type;
+
+##########################
+# 2026-09-24 (Android 13, SELinux lane).
+
+# /data/ccci_cfg -- modem config store, mkdir'd by init.m95.modem.rc:47 and
+# read by ccci_mdinit. FACT (192234): denied { getattr } path=/data/ccci_cfg
+# scontext=ccci_mdinit tcontext=system_data_file; 113630: vendor_init
+# { create } name=ccci_cfg on system_data_file. Own type: a vendor daemon on
+# generic system_data_file is exactly what domain.te forbids.
+type ccci_cfg_file, file_type, data_file_type, core_data_file_type;
+
+# /proc/last_kmsg -- the MTK 3.18 kernel still exports it and the platform
+# init.rc chowns/chmods it; A13 has no type for it, so it is plain `proc`,
+# which private/coredomain.te forbids to core domains. FACT (both captures):
+# denied { setattr } name=last_kmsg scontext=init tcontext=proc, and (192234)
+# { read open getattr } path=/proc/last_kmsg scontext=system_server
+# (BootReceiver's SYSTEM_LAST_KMSG dropbox entry).
+type m95_proc_last_kmsg, fs_type, proc_type;
+
+# /proc/sys/vm/swappiness -- init.m95.mem.rc:14 writes 100 for zram. A13
+# labels a handful of /proc/sys/vm knobs, not this one, and vendor_init may
+# write only proc_net_type and proc_page_cluster among proc types. FACT (both
+# captures): denied { write } name=swappiness scontext=vendor_init
+# tcontext=proc. Under enforcing the write fails and zram swapping falls back
+# to the kernel default of 60.
+type m95_proc_swappiness, fs_type, proc_type;
+
+# /sys/kernel/debug/ged/hal/custom_boost_gpu_freq -- GPU frequency floor
+# written by init.m95.mem.rc:27. FACT (192234): denied { write } scontext=
+# vendor_init tcontext=debugfs. This 3.18 kernel labels debugfs by path
+# (security/selinux/hooks.c:737, SE_SBGENFS), so one file can get a type.
+type m95_debugfs_ged_boost, fs_type, debugfs_type;

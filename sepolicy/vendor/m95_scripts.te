@@ -47,7 +47,18 @@ allow m95_bdaddr vendor_toolbox_exec:file { read open getattr execute execute_no
 allow m95_bdaddr vendor_file:dir { search read open getattr };
 allow m95_bdaddr nvdata_file:dir search;
 allow m95_bdaddr nvdata_file:file { read open getattr };
-set_prop(m95_bdaddr, bluetooth_prop)
+# 2026-09-24 (A13): set_prop(m95_bdaddr, bluetooth_prop) removed. It violates
+# the compatible_property_only neverallow (private/property.te: bluetooth_prop
+# is set/read only by core, bluetooth and hal_bluetooth_server), and on A13 it
+# has no consumer: persist.service.bdroid.bdaddr occurs in
+# packages/modules/Bluetooth only in system/doc/properties.md, and in neither
+# libbluetooth_mtk.so nor libbt-vendor.so. The address reaches the stack from
+# the controller, which libbluetooth_mtk programs from the same NVRAM file.
+# Under enforcing the script's getprop/setprop are denied (two avc lines per
+# boot, expected) and it exits 0.
+# FALSIFIER: under enforcing, `dumpsys bluetooth_manager | grep address` must
+# equal the bytes of /data/nvram/APCFG/APRDEB/BT_Addr. If it does not, the fix
+# is a vendor BT-HAL path, not this grant.
 
 ##############################################################################
 # m95_fatal_capture — bring-up helper: pins CPUs and captures state into
@@ -71,3 +82,24 @@ allow m95_fatal_capture cgroup:dir { search read open };
 allow m95_fatal_capture cgroup:file { read write open getattr };
 allow m95_fatal_capture cache_file:dir { search write add_name create setattr getattr open read };
 allow m95_fatal_capture cache_file:file { create write open getattr setattr };
+
+##############################################################################
+# 2026-09-24 (Android 13, SELinux lane): what the A13 version of
+# m95-cpuset.sh touches (FACT, both captures unless noted, scontext=
+# m95_cpuset, comm sh/grep/cat):
+#   /proc/hps/enabled           proc_hps            { search } dir, { open write } file
+#   /proc/driver/thermal/tzcpu  proc_mtk_thermal    { search }, { getattr open read write }
+#                               (thermal_once(): re-asserts the 85 C trip table)
+#   /sys/.../cpuN/online        sysfs_devices_system_cpu { write }
+#   /sys/module/lowmemorykiller/parameters/minfree  sysfs_lowmemorykiller
+#                               { search } dir, { open read write } file (192234;
+#                               lmk_once(), commit 3d28e58)
+# Under enforcing each write would fail silently (`2>/dev/null || true`), i.e.
+# the thermal table, the online mask and the LMK tiers would quietly revert.
+allow m95_cpuset proc_hps:dir search;
+allow m95_cpuset proc_hps:file { getattr open write };
+allow m95_cpuset proc_mtk_thermal:dir search;
+allow m95_cpuset proc_mtk_thermal:file rw_file_perms;
+allow m95_cpuset sysfs_devices_system_cpu:file rw_file_perms;
+allow m95_cpuset sysfs_lowmemorykiller:dir search;
+allow m95_cpuset sysfs_lowmemorykiller:file rw_file_perms;

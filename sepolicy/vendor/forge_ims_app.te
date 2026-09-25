@@ -99,8 +99,15 @@ get_prop(radio, m95_volte_svc_prop)
 # (public/domain.te:527 -- neverallow на default_prop:property_service set), а
 # persist.forge.* -- это ручки bring-up, которые крутят через adb. Со своим
 # типом это выражается явно и только на отладочной сборке.
+#
+# 2026-09-24 (A13): the set half is gone. m95_forge_prop is a vendor type now
+# (vendor_restricted_prop, property.te), and private/property.te:324 forbids
+# any core domain but init to set a vendor property -- shell included; the
+# only escape is the system_writes_vendor_properties_violators attribute,
+# which is not worth spending on a bring-up knob. Set the knobs as root
+# instead: `adb root; adb shell setprop persist.forge.<knob> <v>` -- su is a
+# permissive domain on userdebug (private/su.te), so no rule is needed.
 userdebug_or_eng(`
-  set_prop(shell, m95_forge_prop)
   get_prop(shell, m95_forge_prop)
 ')
 

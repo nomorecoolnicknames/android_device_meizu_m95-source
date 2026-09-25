@@ -3,39 +3,60 @@
 # (The m681 template carries ~110 cm-14.1-era prop types, most unbound; that
 # pile is NOT copied. Add types here only together with a property_contexts
 # binding and a user.)
+#
+# Android 13 (2026-09-24, SELinux lane). Every type here is declared through
+# vendor_internal_prop / vendor_restricted_prop instead of a bare
+# `type X, property_type;`. A13 enforces property ownership
+# (private/property.te:57, enforce_sysprop_owner): a property type that is
+# neither system_, product_ nor vendor_property_type trips a neverallow for
+# every domain that reads it -- 54 rules in the host secilc run of the
+# 2026-09-16 policy. Rule of thumb used below:
+#   internal   -- only vendor domains (and init) touch it;
+#   restricted -- vendor sets, a core domain (radio, system_server,
+#                 surfaceflinger, bluetooth) also reads it.
+# Nothing here is vendor_public: no core domain may SET our properties
+# (private/property.te:324), which is why the adb-shell knob grant in
+# forge_ims_app.te is gone (use `adb root`; su is permissive on userdebug).
+#
+# NOTE: vendor_init gets NO right on vendor_property_type by default. Every
+# type that /vendor/build.prop sets or a vendor rc trigger reads needs its own
+# set_prop/get_prop(vendor_init, ...) -- see vendor_init.te. Build.prop is
+# loaded before init installs its SELinux log callback (system/core/init/
+# init.cpp:887 vs :901), so a missing grant here drops the property under
+# enforcing WITHOUT any avc line in dmesg or logcat.
 
 # WMT combo-chip state (persist.mtk.wcn.*, service.wcn.*) — set by the wmt
 # loader chain, read by the wifi/bt stack. [CONV]
-type wmt_prop, property_type;
+vendor_restricted_prop(wmt_prop)
 
 # GPS daemon state. [CONV]
-type mnld_prop, property_type;
+vendor_internal_prop(mnld_prop)
 
 # Modem state (ril.active.md, mtk.md*). [CONV]
-type mtk_md_prop, property_type;
+vendor_restricted_prop(mtk_md_prop)
 
 # ctl. ACL for the MTK radio service zoo (ctl.ccci*, ctl.ril-*, ctl.muxreport*,
 # ctl.*mdlogger*, ctl.gsm0710muxd*): one type instead of the m681 template's
 # 25 separate ctl_*_prop types — property_contexts prefixes cover the set. [CONV]
-type ctl_mtk_radio_prop, property_type;
+vendor_internal_prop(ctl_mtk_radio_prop)
 
 # nvram_daemon readiness flag (service.nvram_init). [CONV]
-type nvram_prop, property_type;
+vendor_restricted_prop(nvram_prop)
 
 # MTK log daemons (persist.mtklog.*, debug.mdlogger.*). [CONV]
-type mtklog_prop, property_type;
+vendor_internal_prop(mtklog_prop)
 
 # AKM compass driver control flags (nosecure.akm.*), set by the sensor HAL.
 # These land on default_prop otherwise, which no HAL may set. [CONV]
-type m95_sensor_prop, property_type;
+vendor_internal_prop(m95_sensor_prop)
 
 # PQ (picture-quality) tuning knobs: persist.sys.pq.* and debug.pq.*. Without a
 # type of their own they fall on system_prop/debug_prop, which the pq domain
 # may not set, and every boot loses the tuning and logs an error per knob. [CONV]
-type m95_pq_prop, property_type;
+vendor_restricted_prop(m95_pq_prop)
 
 # Wi-Fi 5G capability flag published by nvram_daemon (ro.wlan.mtk.*). [CONV]
-type m95_wlan_prop, property_type;
+vendor_restricted_prop(m95_wlan_prop)
 
 # volte daemon control pairs, set by mtkmal. [FACT 2026-08-18 census #2:
 # denied { set } property=ctl.stop$volte_{stack,ua,imcb} from u:r:mtkmal:s0,
@@ -43,14 +64,14 @@ type m95_wlan_prop, property_type;
 # prefixes (see the ril-daemon note below in property_contexts), so this
 # hands mtkmal control of the three VoLTE daemons only, not ctl_stop_prop
 # wholesale.
-type ctl_volte_prop, property_type;
+vendor_internal_prop(ctl_volte_prop)
 
 # MAL LTE-handover flag. [FACT 2026-08-18 census #2: denied { set }
 # property=net.handover.thlte tcontext=system_prop] Typed so a vendor daemon
 # does not get system_prop wholesale; "net.handover." is longer than plat's
 # "net." prefix, so this binding wins the lookup. No reader of the property
 # exists in our system image today; a reader would census a read denial.
-type m95_handover_prop, property_type;
+vendor_internal_prop(m95_handover_prop)
 
 # Forge bring-up knobs: persist.forge.* (ims_single_transport, ims_modem_kick,
 # ims_pdn_holder, ims_auto_recover, ims_kick_ril, ims_reg_watch_idle_min,
@@ -59,7 +80,7 @@ type m95_handover_prop, property_type;
 # Without a type of their own they land on default_prop, which AOSP grants no
 # domain a read on -- so the alternative is get_prop(radio, default_prop), a
 # grant on every unlabelled property on the device. [CONV]
-type m95_forge_prop, property_type;
+vendor_restricted_prop(m95_forge_prop)
 
 # init.svc.volte_{ua,stack,imcb,kicker}. init publishes the readiness of every
 # service under init.svc.<name>; only the vendor./odm. prefixed ones get
@@ -67,7 +88,7 @@ type m95_forge_prop, property_type;
 # to default_prop. ForgeImsService polls init.svc.volte_imcb before kicking the
 # modem (A11_BRINGUP_STATE §2r, "звено 8"), so `radio` has to be able to read
 # these four names -- and only these four. [CONV]
-type m95_volte_svc_prop, property_type;
+vendor_restricted_prop(m95_volte_svc_prop)
 
 # MTK vendor telephony/IMS knobs that a CORE process has to read.
 #
@@ -103,4 +124,109 @@ type m95_volte_svc_prop, property_type;
 # Своим типом, а не get_prop(radio, vendor_default_prop): последнее отдало бы
 # radio каждое вендорное свойство на аппарате. Вендорные читатели ничего не
 # теряют -- ниже воспроизведён тот же самый набор, что им давала платформа. [CONV]
-type m95_ims_vendor_prop, property_type;
+vendor_restricted_prop(m95_ims_vendor_prop)
+
+##############################################################################
+# 2026-09-24, SELinux lane: MTK names that land on platform types a vendor
+# domain may not touch on Android 13.
+#
+# FACT (system/sepolicy/public/property.te:236, private/property.te:66-73 and
+# the compatible_property_only block): default_prop is system_internal, so NO
+# vendor domain may read it; system_prop and net_radio_prop are
+# core_property_type, readable and settable by core domains and vendor_init
+# only; radio_prop is readable/settable only by core, app and
+# hal_telephony_server. The N-era MTK blobs read and write dozens of names in
+# those namespaces (strings of each daemon's /vendor DT_NEEDED closure,
+# captured in the design note). Relabelling the names is the only legal fix;
+# the alternative -- exemption attributes -- does not exist for these rules.
+#
+# Only names that are actually SET somewhere (vendor/build.prop, an rc file or
+# a daemon) are relabelled. A denied read of a property nobody sets returns
+# the same default an unlabelled read would, so the unset debug knobs stay on
+# the platform types and keep producing an (expected) avc line.
+##############################################################################
+
+# MTK feature/config switches: ro.mtk_*, persist.mtk_*, persist.mtk.*,
+# mtk.eccci.*, ro.telephony.sim.count, persist.chiptest*, the legacy
+# rild.libpath/libargs pair. Set by vendor/build.prop (vendor_init), read by
+# every MTK vendor daemon and HAL. Restricted, not internal, only so that a
+# core reader can be granted later without redeclaring the type; none is
+# known today (the IMS APK sources carry persist.mtk_epdg_support only in a
+# commented-out line, XcapMobileDataNetworkManager.java:271).
+vendor_restricted_prop(m95_mtk_config_prop)
+
+# MTK RIL/MAL/MUX state shared between vendor daemons: ril.first.md,
+# ril.external.md, ril.telephony.mode, ril.mal*, ril.volte.mal.*, ril.mux*,
+# ril.getccci.response, ril.pid.*, ril.phone{1,2}.mapped.md, ril.epdg.*,
+# ril.data.mal, ril.rilproxy, ril.emulation.userload, persist.radio.mtk_*,
+# persist.radio.mnl.prop. On radio_prop only rild could read them; mtkmal,
+# gsm0710muxd, ccci_mdinit, mnld, epdg_wod, the audio HAL and vendor_init
+# could not (neverallow, compatible_property_only block). gsm.* names stay on
+# radio_prop: the framework reads them and rild already owns them.
+vendor_restricted_prop(m95_mtk_ril_prop)
+
+# init.svc.<name> of two vendor services that vendor code polls:
+# init.svc.ril-proxy (ccci_mdinit) and init.svc.goodixfpd (a vendor rc
+# trigger). The plat catch-all init_service_status_private_prop is
+# system_internal. Same pattern as m95_volte_svc_prop above.
+vendor_restricted_prop(m95_vendor_svc_prop)
+
+# sys.usb.vid: set by init.mt6797.usb.rc and expanded (${sys.usb.vid}) in the
+# same file, i.e. read and written only by vendor_init. On the plat `sys.`
+# prefix it is system_prop.
+vendor_internal_prop(m95_usb_prop)
+
+# debug.hwc.*: tuneables hwcomposer.mt6797.so publishes (debug.hwc.bq_count
+# and debug.hwc.compose_level were live in getprop, 2026-09-24 19:23). A vendor
+# domain may read debug_prop but not set it (compatible_property_only "Prevent
+# properties from being set"), which is what graphics.te used to grant.
+vendor_internal_prop(m95_hwc_debug_prop)
+
+# ro.vendor.vintf.legacy_kernel: set in vendor/build.prop, read by
+# system_server -- frameworks/base core/jni/android_os_VintfObject.cpp:106
+# (branch meizu-legacy-vendor) skips the kernel-config check with it, which is
+# what keeps the "internal problem" dialog away (commit cc14611). On
+# vendor_default_prop (vendor_internal) a core read is neverallowed, so under
+# enforcing the read would return false and the dialog would come back.
+# FACT: denied { read } scontext=system_server tcontext=vendor_default_prop,
+# capture m95-boot-20260924-192234.
+vendor_restricted_prop(m95_exported_vendor_prop)
+
+##############################################################################
+# 2026-09-24, SELinux lane: PREPARED for paths the captures did not exercise
+# (voice call, VoLTE). The names come from strings, not from denials; the
+# first call under permissive must confirm them (design note, "unknowns").
+##############################################################################
+
+# MTK audio-HAL state and feature switches: af.modem_{1,2,ext}.status,
+# af.recovery.{dl,ul,mic}_mute_on, af.rf_{info,mode}, af.ril.* (speech codec,
+# HD voice), af.mixer.pcm, af.track.pcm, af.karaoke.*, af.resouce.*,
+# persist.af.* (13 names). Only audio.primary.mt6797.so carries them (strings
+# of mtk-ril, librilmtk, librilimp, mtkmal, libmal and the volte daemons have
+# no af.* at all); AudioFlinger's own af.* names (af.fast_track_multiplier,
+# af.tee, af.thread.throttle, af.patch_park, af.resampler.quality --
+# frameworks/av) are different names and stay where they are. On default_prop
+# the HAL can neither read nor set them under A13.
+vendor_internal_prop(m95_audio_hal_prop)
+
+# VoLTE stack bookkeeping: net.ims.ipsec.version, net.ims.volte.pid (strings
+# of volte_stack) and service.ims.icsi.* (volte_ua, volte_stack). The plat
+# `net.` and `service.` prefixes make them system_prop, which a vendor daemon
+# may neither read nor set.
+vendor_internal_prop(m95_volte_prop)
+
+# persist.camera.* -- switches of the camera provider (hal_camera_default):
+# hardware/interfaces camera/common/1.0/default/CameraModule.cpp reads
+# big_yuv (:306), reprocessing (:390), fake_raw (:490), raw_front (:496),
+# native_jpeg (:580); libm95_camera_metadata_raw, loaded into the provider by
+# the linker shim (BoardConfig.mk TARGET_LD_SHIM_LIBS), reads raw
+# (camera_metadata_raw/m95_scaler_raw.cpp:178). vendor/build.prop sets
+# big_yuv, fake_raw, raw_front and raw. A13 has no platform entry for the
+# prefix, so the names fall on default_prop: vendor_init could not set them
+# from build.prop and the provider could not read them -- RAW16 and the big
+# YUV table would switch off without an avc line (build.prop is loaded before
+# init's SELinux logging). frameworks/av has no "persist.camera." literal, so
+# cameraserver is not a reader. Restricted rather than internal so a
+# diagnostic core reader can be granted later; setting them by hand needs
+# `adb root` (su), as it did on default_prop.
+vendor_restricted_prop(m95_camera_prop)

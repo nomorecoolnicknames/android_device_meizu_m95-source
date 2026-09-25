@@ -32,7 +32,9 @@ init_daemon_domain(viarild)
 # via ctl. properties and flags modem state.
 set_prop(ccci_mdinit, mtk_md_prop)
 set_prop(ccci_mdinit, ctl_mtk_radio_prop)
-get_prop(ccci_mdinit, radio_prop)
+# get_prop(ccci_mdinit, radio_prop) removed 2026-09-24 (A13 neverallow: only
+# hal_telephony_server may read radio_prop among vendor domains). Its ril.*
+# names are m95_mtk_ril_prop now -- mtk_props.te.
 set_prop(statusd, mtk_md_prop)
 get_prop(ccci_fsd, mtk_md_prop)
 
@@ -59,7 +61,8 @@ allow ccci_mdinit block_device:dir search;
 
 # 27.010 mux daemons sit between rild and the CCCI tty.
 allow gsm0710muxd ccci_device:chr_file rw_file_perms;
-set_prop(gsm0710muxd, radio_prop)
+# set_prop(gsm0710muxd, radio_prop) removed 2026-09-24 (A13 neverallow); its
+# ril.mux* / ril.telephony.mode names are m95_mtk_ril_prop -- mtk_props.te.
 get_prop(gsm0710muxd, mtk_md_prop)
 # gsm0710muxd hands the RIL over once the MUX is up: property_set("ctl.stop",
 # "ril-daemon") then property_set("ctl.start","ril-daemon-mtk")
@@ -112,3 +115,8 @@ allow ccci_mdinit sysfs_ccci:dir search;
 # tty. FACT: { setuid } self capability (x2). setgid not observed; add it
 # only if a denial names it.
 allow gsm0710muxd self:capability setuid;
+
+# 2026-09-24 (A13): /data/ccci_cfg has its own type (file.te). ccci_mdinit
+# keeps the modem's config files there (MD1/MD3 version stamps).
+allow ccci_mdinit ccci_cfg_file:dir create_dir_perms;
+allow ccci_mdinit ccci_cfg_file:file create_file_perms;

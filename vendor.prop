@@ -145,7 +145,10 @@ persist.mtk.wcn.fwlog.status=0
 # work. Force the legacy sync path (usb.cpp: ro.adb.nonblocking_ffs) AND the
 # non-AIO read/write inside it (usb_legacy.cpp: sys.usb.ffs.aio_compat).
 # init.mt6797.usb.rc sets the second one at early-init as well.
-ro.adb.nonblocking_ffs=false
+# ro.adb.nonblocking_ffs lives in system.prop since 2026-09-24: it is a
+# platform name (default_prop), which vendor_init may not set, so from this
+# file it would be dropped under enforcing -- silently, since build.prop is
+# loaded before init's SELinux logging is up (sepolicy/vendor/vendor_init.te).
 sys.usb.ffs.aio_compat=1
 
 # Bluetooth: CONSYS FW advertises LE Data Length Extension (LE features byte0

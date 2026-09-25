@@ -1,0 +1,151 @@
+# vendor_init -- Meizu MX6 (m95), Android 13.
+#
+# vendor_init runs every command of every rc file under /vendor, loads
+# /vendor/build.prop, and evaluates the property triggers of those rc files.
+# It holds no right on vendor_property_type by default (public/vendor_init.te
+# grants only a fixed list of platform types), so each of our property types
+# that it sets or reads is named here.
+
+##############################################################################
+# Properties
+##############################################################################
+# /vendor/build.prop. Loaded in PropertyInit() -- system/core/init/init.cpp:887
+# -- BEFORE SelinuxSetupKernelLogging() at :901, so a refused line leaves no
+# avc anywhere; under enforcing the property is simply absent. The set below
+# is computed, not observed: every key of the b11 vendor/build.prop mapped
+# through the built property_contexts, then checked against the compiled
+# policy (checkpolicy -b -d, compute_access_vector). Keys and the types they
+# resolve to after this change:
+#   ro.mtk_*, persist.mtk*, mtk.eccci.c2k, ro.telephony.sim.count,
+#   rild.lib{path,args},
+#   ro.boot.opt_* (the modem option set)             -> m95_mtk_config_prop
+#   ril.{first,external}.md, ril.telephony.mode,
+#   ril.mal.socket, persist.radio.mtk_*               -> m95_mtk_ril_prop
+#   ro.mtk_pq_support, ro.mtk_pq_color_mode           -> m95_pq_prop
+#   persist.vendor.mtk.volte.enable                   -> m95_ims_vendor_prop
+#   persist.mtk.wcn.fwlog.status                      -> wmt_prop
+#   ro.vendor.vintf.legacy_kernel                     -> m95_exported_vendor_prop
+#   persist.camera.{big_yuv,fake_raw,raw_front,raw}   -> m95_camera_prop
+set_prop(vendor_init, {
+  m95_camera_prop
+  m95_mtk_config_prop
+  m95_mtk_ril_prop
+  m95_pq_prop
+  m95_ims_vendor_prop
+  wmt_prop
+  m95_exported_vendor_prop
+})
+
+# rc commands: `setprop ril.mal ...` (init.mal.rc) is covered above;
+# `setprop sys.usb.vid` + `${sys.usb.vid}` (init.mt6797.usb.rc).
+set_prop(vendor_init, m95_usb_prop)
+
+# Keys of vendor/build.prop that stay refused on purpose:
+#   ro.secure=0, ro.adb.secure=0, ro.debuggable=1, persist.sys.usb.config=adb
+#     (device.mk PRODUCT_DEFAULT_PROPERTY_OVERRIDES, "insecure ADB early").
+#     Platform-owned; system/build.prop already carries ro.secure=1,
+#     ro.adb.secure=1, ro.debuggable=1, and duplicating them there fails the
+#     build (build/make/tools/post_process_props.py:112). Consequence under
+#     enforcing: adbd is not root by default and asks for key authorisation --
+#     authorise the host key and use `adb root` (ro.debuggable=1 stays).
+#   ro.recovery.usb.* -- read by recovery only.
+#   ro.adb.nonblocking_ffs -- moved to system.prop, see there.
+
+# Property triggers in vendor rc files. With
+# ro.actionable_compatible_property.enabled=true (FACT, getprop of both
+# captures) init checks at parse time that vendor_init may READ the trigger
+# property (system/core/init/action_parser.cpp:40-58); a refusal is the error
+# "unexported property trigger found" (:73) and the whole action is dropped.
+# Permissive hides it: the check passes and only the avc is left. FACT, both
+# captures, scontext=vendor_init tclass=file { read }:
+#   property=service.nvram_init        nvram_prop     (init.m95.*: NVRAM-ready chain)
+#   property=persist.forge.volte_kicker m95_forge_prop (init.m95.volte.rc)
+#   property=ril.mal                   radio_prop  -> m95_mtk_ril_prop (init.mal.rc)
+#   property=persist.m95.pq.enable     default_prop -> m95_pq_prop (init.mt6797.rc)
+# and, by the same mechanism, the remaining vendor triggers (strings of the
+# built /vendor/etc/init/*.rc): ril.rilproxy, persist.chiptest.enable,
+# persist.mtk_epdg_support, init.svc.goodixfpd.
+get_prop(vendor_init, {
+  nvram_prop
+  m95_forge_prop
+  m95_vendor_svc_prop
+})
+
+##############################################################################
+# Files
+##############################################################################
+# MTK's fixed /data paths, created by our rc files at post-fs-data. They carry
+# core_data_file_type (A13 sepolicy_tests require it for every type on /data
+# outside /data/vendor*), and public/vendor_init.te grants vendor_init dir
+# creation on file_type MINUS core_data_file_type -- so every mkdir below is
+# refused under enforcing, and the daemon behind it starts without its store.
+# vendor_init is in data_between_core_and_vendor_violators (violators.te),
+# which lifts the matching neverallow (public/domain.te:865-876).
+# FACT (both captures, scontext=vendor_init, tclass=dir):
+#   /data/md3 ccci_data_file, /data/gf_data gf_data_file, /data/gps_mnl
+#   mnld_data_file, /data/misc/sensor mtk_sensor_data_file, /data/.tp
+#   thermal_data_file { create getattr setattr }; /data/ipsec
+#   epdg_wod_data_file { create add_name write getattr };
+#   /data/misc/mcRegistry mcd_data_file { create add_name write open read
+#   search getattr setattr }; /data/nvram + /nvdata nvdata_file { create
+#   add_name write getattr setattr }; 113630 (fresh /data): the parents,
+#   system_data_file { add_name create write open read } for misc, sensor,
+#   ccci_cfg.
+allow vendor_init {
+  ccci_data_file
+  ccci_cfg_file
+  epdg_wod_data_file
+  gf_data_file
+  mcd_data_file
+  mnld_data_file
+  mtk_sensor_data_file
+  nvdata_file
+  thermal_data_file
+}:dir { create search getattr open read setattr write add_name relabelfrom relabelto };
+allow vendor_init { system_data_root_file system_data_file }:dir { write add_name };
+
+# init.mt6797.rc: `copy /vendor/etc/fstab.mt6797 /data/nvram/fstab.mt6797`
+# and chmod -- libnvram parses it to find the raw nvram partition; without it
+# service.nvram_init never turns Ready (see the rc comment). FACT (192234):
+# denied { open write setattr } name=fstab.mt6797 tcontext=nvdata_file.
+allow vendor_init nvdata_file:file { create getattr open read write setattr };
+
+# restorecon_recursive of /data/md3, /data/ccci_cfg, /data/misc/mcRegistry,
+# and `restorecon /data/iNemoEngine_gbias.dat` (init.mt6797.rc:120). FACT
+# (b16, m95-b16-noims-20260924): denied { getattr }
+# path=/data/iNemoEngine_gbias.dat tcontext=mtk_sensor_data_file.
+allow vendor_init { ccci_data_file ccci_cfg_file mcd_data_file mtk_sensor_data_file }:file { getattr relabelfrom relabelto };
+
+# init.mt6797.rc:80 `restorecon_recursive /dev/block/platform/mtk-msdc.0`
+# relabels the by-name symlinks from block_device to the per-partition types.
+# vendor_init's relabelto covers file_type only, not dev_type. FACT (both
+# captures): relabelfrom on block_device:lnk_file and relabelto on the
+# eighteen types below. Symlink labels do not gate access
+# (public/domain.te:67 lets every domain follow dev_type links); granted to
+# keep the rc line from failing, not for a functional reason.
+allow vendor_init block_device:lnk_file relabelfrom;
+allow vendor_init {
+  boot_block_device
+  cache_block_device
+  expdb_block_device
+  frp_block_device
+  lk_block_device
+  logo_block_device
+  mdimg_block_device
+  misc_block_device
+  nvcfg_device
+  nvdata_device
+  nvram_device
+  proinfo_block_device
+  protect_f_device
+  protect_s_device
+  recovery_block_device
+  seccfg_block_device
+  system_block_device
+  userdata_block_device
+}:lnk_file relabelto;
+
+# init.m95.mem.rc: swappiness 100 for zram and the GED GPU-frequency floor.
+# Types in file.te / genfs_contexts.
+allow vendor_init m95_proc_swappiness:file w_file_perms;
+allow vendor_init m95_debugfs_ged_boost:file w_file_perms;

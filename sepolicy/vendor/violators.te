@@ -89,3 +89,9 @@ typeattribute mcd socket_between_core_and_vendor_violators;
 # move to /data/vendor. Same exemption the sibling port in this tree uses:
 # device/nubia/msm8953-common/sepolicy/vendor/vendor_init.te:1.
 typeattribute vendor_init data_between_core_and_vendor_violators;
+
+# 2026-09-24 (A13): goodixfingerprintd moved from the core fingerprintd domain
+# to the vendor domain goodixfpd (fingerprintd.te). Its template store
+# /data/gf_data (gf_data_file) and the Trustonic registry it reads
+# (mcd_data_file) are fixed paths in libgf_hal / libMcClient.
+typeattribute goodixfpd data_between_core_and_vendor_violators;

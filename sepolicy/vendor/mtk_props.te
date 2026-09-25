@@ -1,0 +1,72 @@
+# Readers and writers of the MTK property types added for Android 13
+# (property.te, bottom block; names in property_contexts, bottom block).
+#
+# Sources, in order of weight:
+#   FACT  avc denials of the two permissive boots of 2026-09-24
+#         (captures m95-boot-20260924-113630 and -192234);
+#   FACT  property names in the strings of each daemon's /vendor DT_NEEDED
+#         closure, mapped through the built property_contexts;
+#   FACT  vendor/build.prop and vendor rc files of the b11 image.
+# A property read is logged once per (domain, property page) per boot, so a
+# denial names the page, never the property; the name comes from the strings.
+
+##############################################################################
+# m95_mtk_config_prop -- ro.mtk_*, persist.mtk*, mtk.eccci.*, ...
+##############################################################################
+# Set from vendor/build.prop, i.e. by vendor_init (vendor_init.te).
+# Read-only configuration consulted by every MTK blob: libcustom_nvram (in
+# nvram_daemon, ccci_fsd, ccci_mdinit, mnld, the BT HAL), librilimp/mtk-ril
+# (rild), libmdfx (mtkmal), the camera and codec stacks. Same shape the
+# platform uses for vendor_default_prop (private/domain.te), so a daemon on a
+# path the captures did not exercise (VoLTE, GPS fix, camera RAW, FM) is not
+# starved of its feature flags.
+get_prop({ domain -coredomain -appdomain }, m95_mtk_config_prop)
+
+##############################################################################
+# m95_mtk_ril_prop -- ril.first.md, ril.mal*, ril.mux*, persist.radio.mtk_* ...
+##############################################################################
+# Writers, each proven by strings of the binary and, where the daemon ran in
+# the captures, by a denial on radio_prop:
+#   rild         mtk-ril.so/librilimp.so: ril.rilproxy, ril.external.md, ril.mux*
+#   gsm0710muxd  ril.muxreport, ril.mux.report.case (was set_prop radio_prop)
+#   mtkmal       ril.mal.flag, ril.muxreport       (was set_prop radio_prop)
+#   ccci_mdinit  ril.getccci.response, ril.pid.*, ril.mux.report.case
+set_prop({ rild gsm0710muxd mtkmal ccci_mdinit }, m95_mtk_ril_prop)
+
+# Readers:
+#   mnld               persist.radio.mnl.prop     FACT denied read radio_prop (x2 boots)
+#   hal_audio_default  ril.phone{1,2}.mapped.md   strings of audio.primary.mt6797.so
+#   epdg_wod           ril.epdg.interface.ctrl    strings of epdg_wod
+#   volte_*            ril.volte.mal.*            set by mtkmal, consumed by the
+#                                                 VoLTE stack (path not exercised)
+get_prop({ mnld hal_audio_default epdg_wod volte_ua volte_stack volte_imcb }, m95_mtk_ril_prop)
+
+# persist.radio.multisim.config is radio_control_prop (system_public; only its
+# set is restricted). FACT: denied { read } radio_control_prop from mtkmal
+# (192234); strings put the same name in epdg_wod.
+get_prop({ mtkmal epdg_wod }, radio_control_prop)
+
+##############################################################################
+# Small single-owner types
+##############################################################################
+# init.svc.ril-proxy: ccci_mdinit polls it. FACT: denied { read }
+# init_service_status_private_prop from ccci_mdinit (192234); strings of
+# ccci_mdinit carry init.svc.ril-proxy and init.svc.debuggerd (the latter does
+# not exist on A13 and stays unlabelled).
+get_prop(ccci_mdinit, m95_vendor_svc_prop)
+
+# debug.hwc.*: published by the composer (was set_prop debug_prop, which A13
+# neverallows for a vendor domain).
+set_prop(hal_graphics_composer_default, m95_hwc_debug_prop)
+
+# ro.vendor.vintf.legacy_kernel, read by system_server's VintfObject JNI.
+get_prop(system_server, m95_exported_vendor_prop)
+
+##############################################################################
+# PREPARED (call / VoLTE paths, not exercised in the 2026-09-24 captures).
+##############################################################################
+# The audio HAL keeps modem-speech and mute-recovery state in af.* and reads
+# its persist.af.* feature switches.
+set_prop(hal_audio_default, m95_audio_hal_prop)
+# VoLTE daemons publish and read their IMS bookkeeping.
+set_prop({ volte_ua volte_stack volte_imcb }, m95_volte_prop)

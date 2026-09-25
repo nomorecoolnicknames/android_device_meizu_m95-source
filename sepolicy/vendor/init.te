@@ -204,3 +204,7 @@ allow init rild:unix_stream_socket connectto;
 # re-homing rule as the rild-oem pair.
 allow init proc_mtk_thermal:file r_file_perms;
 allow init self:netlink_socket create_socket_perms_no_ioctl;
+
+# 2026-09-24 (A13): /proc/last_kmsg has its own type (file.te,
+# genfs_contexts); the platform init.rc chowns and chmods it.
+allow init m95_proc_last_kmsg:file { getattr setattr };
