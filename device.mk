@@ -295,14 +295,37 @@ PRODUCT_PACKAGES += \
     android.hardware.bluetooth@1.0-impl \
     android.hardware.bluetooth@1.0-service
 
-# RAW16 for the rear camera: libm95_camera_metadata_raw appends the 4032x3016
-# row to the vendor's own stream table (the copy AppStreamMgr::checkStream and
-# the pipeline read). TARGET_LD_SHIM_LIBS in BoardConfig.mk loads it into the
-# 32-bit provider, which cannot link without it -- do not drop it from here.
-# Off switch without a reflash: persist.camera.raw=0 and a provider restart.
-# See camera_metadata_raw/m95_scaler_raw.cpp.
+# RAW16 for the rear camera and 4:3 viewfinder sizes for both:
+# libm95_camera_metadata_raw appends the rows to the vendor's own stream tables
+# (the copy AppStreamMgr::checkStream and the pipeline read).
+# TARGET_LD_SHIM_LIBS in BoardConfig.mk loads it into the 32-bit provider, which
+# cannot link without it -- do not drop it from here. Off switches without a
+# reflash: persist.camera.raw=0 / preview_43=0 and a provider restart. See
+# camera_metadata_raw/m95_scaler_raw.cpp.
 PRODUCT_PACKAGES += \
     libm95_camera_metadata_raw
+
+# Google Camera as the default camera (owner's request, 2026-09-25): MGC 8.9.097
+# V25, the build that shoots best on this HAL (RAW16 from the row above), with
+# the GServices shim it needs without GMS; overlay-gcam points the power-button
+# gesture and the lockscreen shortcut at it. Aperture stays, for video and as the
+# fallback. The APKs are not in git: run gcam/fetch-gcam.sh once per checkout;
+# it leaves gcam/.fetched only after both hashes and all 25 libraries check out.
+# This product does not set PRODUCT_ENFORCE_PACKAGES_EXIST, so a module missing
+# from PRODUCT_PACKAGES would be dropped without a word (build/make/core/
+# main.mk), hence the explicit check.
+ifneq ($(M95_WITHOUT_GCAM),true)
+  ifneq ($(words $(wildcard \
+          $(LOCAL_PATH)/gcam/MGC_8.9.097_A11_V25_MGC.apk \
+          $(LOCAL_PATH)/gcam/GcamServicesProvider-1.6.1-photos.apk \
+          $(LOCAL_PATH)/gcam/.fetched)),3)
+    $(error m95: Google Camera is not in $(LOCAL_PATH)/gcam; run $(LOCAL_PATH)/gcam/fetch-gcam.sh, or build with M95_WITHOUT_GCAM=true)
+  endif
+  PRODUCT_PACKAGES += \
+      MGC_8_9_097 \
+      GcamServicesProvider
+  DEVICE_PACKAGE_OVERLAYS += $(LOCAL_PATH)/overlay-gcam
+endif
 
 # Gatekeeper: the AOSP SOFTWARE implementation instead of the MediaTek blob.
 # The framework cannot live without an IGatekeeper (18.1, vendor17: with none
