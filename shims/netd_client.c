@@ -19,7 +19,8 @@
  * libandroid_net is LLNDK, and android_setsocknetwork() is exactly
  * setNetworkForSocket() with the netId packed into a net_handle_t and the
  * -errno return turned into -1/errno (frameworks/base/native/android/net.c:
- * 30-63). So this packs the handle the way gethandlefromnetid() does and undoes
+ * 52-65, unpacking in getnetidfromhandle() at 30-43). So this packs the handle
+ * the way gethandlefromnetid() (net.c:45-50) does and undoes
  * the errno conversion: the fwmarkd round trip still happens in the system copy
  * of libnetd_client, with the netd-side permission checks of 18.1. SELinux:
  * net_domain(volte_stack) already grants unix_socket_connect(netdomain,
