@@ -230,3 +230,9 @@ vendor_internal_prop(m95_volte_prop)
 # diagnostic core reader can be granted later; setting them by hand needs
 # `adb root` (su), as it did on default_prop.
 vendor_restricted_prop(m95_camera_prop)
+
+# Performance profile switch and its sub-switches (persist.vendor.m95.
+# perfprofile, .big, .park), read once by the m95_cpuset patrol at start
+# (rootdir/m95-perfprofile.sh). Set by hand with `adb root`; nothing else
+# reads or sets them.
+vendor_internal_prop(m95_perfprofile_prop)

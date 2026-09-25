@@ -103,3 +103,27 @@ allow m95_cpuset proc_mtk_thermal:file rw_file_perms;
 allow m95_cpuset sysfs_devices_system_cpu:file rw_file_perms;
 allow m95_cpuset sysfs_lowmemorykiller:dir search;
 allow m95_cpuset sysfs_lowmemorykiller:file rw_file_perms;
+
+##############################################################################
+# 2026-09-25 (perf profile): what m95-cpuset.sh touches when it sources
+# rootdir/m95-perfprofile.sh (persist.vendor.m95.perfprofile=1). Prepared
+# under permissive, not yet seen as denials -- every path below is one the
+# script writes or reads by name. The profile reads back with shell builtins
+# only; its one exec is /vendor/bin/getprop (the old thermal_once still calls
+# grep, which resolves to /system/bin first in init's PATH -- a vendor domain
+# may not exec that under enforcing; SELinux lane).
+#   the property switch        m95_perfprofile_prop    get
+#   /vendor/bin/getprop        vendor_toolbox_exec     (already granted)
+#   /vendor/bin/m95-perfprofile.sh  vendor_file        read (sourced)
+#   /proc/ppm/policy/hica_power_state      m95_proc_ppm       rw
+#   /proc/cpufreq/cpufreq_power_mode       m95_proc_cpufreq   rw
+#   /proc/perfmgr/touch/tb_freq            m95_proc_perfmgr   rw
+#   /proc/mtkcooler/cpu{27,33}             m95_proc_mtkcooler rw
+#   /proc/driver/thermal/{tzcpu,clctm,clatm_setting}  proc_mtk_thermal (above)
+#   .../cpufreq/interactive/*, cpuN/online sysfs_devices_system_cpu (above)
+#   /sys/class/leds/lcd-backlight/brightness  sysfs_leds  read (screen state)
+get_prop(m95_cpuset, m95_perfprofile_prop)
+allow m95_cpuset vendor_file:file r_file_perms;
+allow m95_cpuset { m95_proc_ppm m95_proc_cpufreq m95_proc_perfmgr m95_proc_mtkcooler }:dir search;
+allow m95_cpuset { m95_proc_ppm m95_proc_cpufreq m95_proc_perfmgr m95_proc_mtkcooler }:file rw_file_perms;
+r_dir_file(m95_cpuset, sysfs_leds)

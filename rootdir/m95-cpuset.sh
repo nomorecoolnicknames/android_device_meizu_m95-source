@@ -55,6 +55,20 @@
 
 set -u
 
+# Performance / thermal profile, off unless persist.vendor.m95.perfprofile=1
+# (rootdir/m95-perfprofile.sh, meizu-fleet/designs/M95_PERF_PROFILE_20260925.md).
+# Read once here: set the property and reboot. When it is on, the profile owns
+# the tzcpu table (thermal_once is skipped) and narrows foreground. The
+# property survives a reflash, so a vendor image without the file must still
+# boot: `.` on a missing file exits a non-interactive shell (POSIX special
+# builtin) -- this script would die before switching hps off below.
+PERFPROFILE=$(/vendor/bin/getprop persist.vendor.m95.perfprofile 2>/dev/null)
+if [ "$PERFPROFILE" = 1 ] && [ -r /vendor/bin/m95-perfprofile.sh ]; then
+    . /vendor/bin/m95-perfprofile.sh
+else
+    PERFPROFILE=
+fi
+
 # BRING-UP (2026-09-06): MTK hps hotplug is switched OFF and a fixed little
 # cluster is pinned. Two reasons, both measured on the R bring-up:
 #  1. kernel panic "BUG: failure at lib/list_debug.c:66/__list_del_entry()" in
@@ -74,7 +88,7 @@ set -u
 # survive hotplug, drivers/watchdog/mediatek/wdk). UI on 4 LITTLE cores was
 # visibly sluggish; with A72 at 2.3 GHz it is not.
 echo 0 > /proc/hps/enabled 2>/dev/null || true
-for _cpu in 1 2 3 4 5 6 7 8 9; do
+for _cpu in ${PP_BOOT_CPUS:-1 2 3 4 5 6 7 8 9}; do
     echo 1 > "/sys/devices/system/cpu/cpu$_cpu/online" 2>/dev/null || true
 done
 
@@ -128,6 +142,7 @@ sync_once() {
         [ -d "/dev/cpuset/$set" ] || continue
         case "$set" in
             background|restricted) want=$LITTLE ;;
+            foreground) want=${PP_FOREGROUND:-$present} ;;
             *) want=$present ;;
         esac
         if [ -n "$want" ] && echo "$want" > "/dev/cpuset/$set/cpus" 2>/dev/null; then
@@ -154,8 +169,20 @@ lmk_once() {
 }
 
 while true; do
-    sync_once
-    thermal_once
+    if [ "$PERFPROFILE" = 1 ]; then
+        pp_cores_once
+        # Parked (experimental, screen off): one core, nothing to sync; poll
+        # the backlight every second so the cores are back right after unlock.
+        if [ "$PP_PARKED" = 1 ]; then
+            sleep 1
+            continue
+        fi
+        sync_once
+        pp_once
+    else
+        sync_once
+        thermal_once
+    fi
     lmk_once
     sleep 5
 done
