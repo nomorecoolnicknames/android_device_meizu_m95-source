@@ -1029,6 +1029,16 @@ vendor/res/sound/testpattern1.wav
 #   vendor/lib64/librilimp.so.orig
 #       Pre-box original of librilimp.so, kept so the box can be verified or
 #       reverted.  Never installed.
+#   vendor/lib/libmal_rilproxy.so
+#       32-bit MAL rilproxy plugin (mtkmal dlopens it by ENTITY_RILPROXY).  Also
+#       BOXED by tools/box-nparcel.py for the same Nougat-Parcel reason: its
+#       104-byte stack Parcel overran the frame cookie and mtkmal died with
+#       "stack corruption detected (-fstack-protector)" on the VoLTE path
+#       (capture m95-b18-volte-20260925).  9 android::Parcel imports -> Pbrcel.
+#       sha256 32f50d9b...2e81fe8 -> fc92ea79...2aece90; .orig keeps the
+#       pristine blob.  It is the only libmal_*.so MAL plugin importing Parcel.
+#   vendor/lib/libmal_rilproxy.so.orig
+#       Pre-box original of the above.  Never installed.
 #   vendor/lib/egl/libGLES_mali.so.orig, vendor/lib/libcam3_app.so.orig
 #       Pre-patch originals of byte-patched blobs, kept so the patch can be
 #       verified or reverted.  Never installed.
