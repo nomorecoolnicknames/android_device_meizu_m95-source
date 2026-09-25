@@ -53,8 +53,13 @@ endif
 # fires when its thumbnail is tapped and hands the picture to the gallery. That
 # second half is why this flavour and not the basic one -- the owner's phone
 # runs it (build 18: com.google.android.apps.photos/
-# de.lukaspieper.gcam.PreviewRedirectActivity after each shot). It takes the
-# package name of Google Photos, which this build does not ship.
+# de.lukaspieper.gcam.PreviewRedirectActivity after each shot). Both flavours
+# carry that activity; they differ in the package name, and the camera sends
+# its review intent to Google Photos by name. The price: as a system package
+# under that name it cannot be removed, and a real Google Photos, signed by
+# someone else, will not install over it. Switch to
+# GcamServicesProvider-1.6.1-basic.apk (de.lukaspieper.gcam.services) if that
+# ever matters more than the thumbnail.
 ifneq ($(wildcard $(LOCAL_PATH)/GcamServicesProvider-1.6.1-photos.apk),)
 
 include $(CLEAR_VARS)

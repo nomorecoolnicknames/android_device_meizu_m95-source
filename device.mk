@@ -308,14 +308,16 @@ PRODUCT_PACKAGES += \
 # V25, the build that shoots best on this HAL (RAW16 from the row above), with
 # the GServices shim it needs without GMS; overlay-gcam points the power-button
 # gesture and the lockscreen shortcut at it. Aperture stays, for video and as the
-# fallback. The APKs are not in git: run gcam/fetch-gcam.sh once per checkout.
-# BUILD_BROKEN_MISSING_REQUIRED_MODULES would drop a missing module from
-# PRODUCT_PACKAGES without a word, hence the explicit check.
+# fallback. The APKs are not in git: run gcam/fetch-gcam.sh once per checkout;
+# it leaves gcam/.fetched only after both hashes and all 25 libraries check out.
+# This product does not set PRODUCT_ENFORCE_PACKAGES_EXIST, so a module missing
+# from PRODUCT_PACKAGES would be dropped without a word (build/make/core/
+# main.mk), hence the explicit check.
 ifneq ($(M95_WITHOUT_GCAM),true)
   ifneq ($(words $(wildcard \
           $(LOCAL_PATH)/gcam/MGC_8.9.097_A11_V25_MGC.apk \
           $(LOCAL_PATH)/gcam/GcamServicesProvider-1.6.1-photos.apk \
-          $(LOCAL_PATH)/gcam/lib/arm64/libgcastartup.so)),3)
+          $(LOCAL_PATH)/gcam/.fetched)),3)
     $(error m95: Google Camera is not in $(LOCAL_PATH)/gcam; run $(LOCAL_PATH)/gcam/fetch-gcam.sh, or build with M95_WITHOUT_GCAM=true)
   endif
   PRODUCT_PACKAGES += \

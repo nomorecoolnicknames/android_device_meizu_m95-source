@@ -1,6 +1,8 @@
 # The preinstalled Google Camera is not versioned: two APKs of other people's
 # proprietary builds (about 300 MB) and the camera's JNI libraries unpacked from
 # one of them. fetch-gcam.sh puts them here from meizu-fleet/artifacts/gcam,
-# checked against the sha256 it pins.
+# checked against the sha256 it pins, and .fetched is its stamp that all of it
+# checked out.
 *.apk
 /lib/
+/.fetched
