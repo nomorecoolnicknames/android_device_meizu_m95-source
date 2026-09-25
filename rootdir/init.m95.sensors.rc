@@ -1,0 +1,32 @@
+# init.m95.sensors.rc — sensors@1.0 service with the input group.
+#
+# The alsps sub-HAL (sensors.alsps.so, dlopened by the sensors.mt6797.so
+# multi-HAL inside this service) reads light and proximity samples from the
+# kernel input devices "bh1745" and "input_prx_apds9922" under /dev/input
+# (blob strings: "/dev/input", "couldn't find '%s' input device"). Those nodes
+# are 0660 root:input. The AOSP rc
+# (hardware/interfaces/sensors/1.0/default/android.hardware.sensors@1.0-service.rc)
+# runs the service as system with "group system wakelock uhid context_hub" and
+# no input, so SensorBase::openInput() fails, the sub-HAL keeps data_fd = -1,
+# and light and proximity register but never deliver an event.
+# FACT 2026-09-25, LOS20 build 18: Groups 1080 3010 3011, no /dev/input fd in
+# the HAL's /proc/<pid>/fd, zero proximity events during a call although the
+# driver reports ABS_DISTANCE on event3 when ps_enable is written by hand.
+# 16.0 and 18.1 fixed the same wall by patching hardware/interfaces (18.1:
+# 74f78db); here the service is redefined from the device tree instead.
+#
+# "override" must precede "interface": ServiceParser::ParseInterface rejects a
+# second owner of ISensors/default unless the service is already marked
+# override. The override only wins if this file is parsed AFTER the AOSP one:
+# /vendor/etc/init is parsed in sorted order, so the file name must sort after
+# "android.hardware.sensors@1.0-service.rc" — keep the "init." prefix, and do
+# not move this file to /vendor/etc/init/hw (those are imported from
+# init.mt6797.rc and parsed before /vendor/etc/init).
+service vendor.sensors-hal-1-0 /vendor/bin/hw/android.hardware.sensors@1.0-service
+    override
+    interface android.hardware.sensors@1.0::ISensors default
+    class hal
+    user system
+    group system wakelock uhid context_hub input
+    capabilities BLOCK_SUSPEND
+    rlimit rtprio 10 10

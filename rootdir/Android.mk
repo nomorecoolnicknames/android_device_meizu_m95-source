@@ -92,6 +92,16 @@ LOCAL_SRC_FILES    := init.m95.mem.rc
 LOCAL_MODULE_PATH  := $(TARGET_OUT_VENDOR_ETC)/init/hw
 include $(BUILD_PREBUILT)
 
+# Sensors service override (adds gid input for the alsps sub-HAL). Goes to
+# /vendor/etc/init, NOT init/hw: it has to be parsed after the AOSP
+# android.hardware.sensors@1.0-service.rc — see the header of the file.
+include $(CLEAR_VARS)
+LOCAL_MODULE       := init.m95.sensors.rc
+LOCAL_MODULE_TAGS  := optional
+LOCAL_MODULE_CLASS := ETC
+LOCAL_SRC_FILES    := init.m95.sensors.rc
+LOCAL_MODULE_PATH  := $(TARGET_OUT_VENDOR_ETC)/init
+include $(BUILD_PREBUILT)
 
 # fstab -> /vendor/etc (fs_mgr + recovery reference) ...
 # ... and the mount points its NV entries need in the system-image root

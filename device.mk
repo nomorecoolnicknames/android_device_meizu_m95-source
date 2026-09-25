@@ -223,6 +223,7 @@ PRODUCT_PACKAGES += \
     init.m95.thermal.rc \
     init.m95.cpuset.rc \
     init.m95.mem.rc \
+    init.m95.sensors.rc \
     init.m95.volte.rc \
     goodixfpd.rc \
     init.m95.bootlog.rc \
