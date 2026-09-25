@@ -304,6 +304,26 @@ PRODUCT_PACKAGES += \
 PRODUCT_PACKAGES += \
     libm95_camera_metadata_raw
 
+# Google Camera as the default camera (owner's request, 2026-09-25): MGC 8.9.097
+# V25, the build that shoots best on this HAL (RAW16 from the row above), with
+# the GServices shim it needs without GMS; overlay-gcam points the power-button
+# gesture and the lockscreen shortcut at it. Aperture stays, for video and as the
+# fallback. The APKs are not in git: run gcam/fetch-gcam.sh once per checkout.
+# BUILD_BROKEN_MISSING_REQUIRED_MODULES would drop a missing module from
+# PRODUCT_PACKAGES without a word, hence the explicit check.
+ifneq ($(M95_WITHOUT_GCAM),true)
+  ifneq ($(words $(wildcard \
+          $(LOCAL_PATH)/gcam/MGC_8.9.097_A11_V25_MGC.apk \
+          $(LOCAL_PATH)/gcam/GcamServicesProvider-1.6.1-photos.apk \
+          $(LOCAL_PATH)/gcam/lib/arm64/libgcastartup.so)),3)
+    $(error m95: Google Camera is not in $(LOCAL_PATH)/gcam; run $(LOCAL_PATH)/gcam/fetch-gcam.sh, or build with M95_WITHOUT_GCAM=true)
+  endif
+  PRODUCT_PACKAGES += \
+      MGC_8_9_097 \
+      GcamServicesProvider
+  DEVICE_PACKAGE_OVERLAYS += $(LOCAL_PATH)/overlay-gcam
+endif
+
 # Gatekeeper: the AOSP SOFTWARE implementation instead of the MediaTek blob.
 # The framework cannot live without an IGatekeeper (18.1, vendor17: with none
 # registered LockSettingsService throws and system_server restarts every ~2

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Meizu MX6 (m95) — SystemUI overlay, only while Google Camera is in the build
+    (device.mk adds this directory together with gcam/).
+-->
+<resources>
+    <!-- The double press of power and the lockscreen camera shortcut open
+         STILL_IMAGE_CAMERA(_SECURE) restricted to this package
+         (SystemUI CameraIntents.getOverrideCameraPackage). Without it the
+         intent resolves to both Google Camera and Aperture and the system
+         asks which. Other applications' IMAGE_CAPTURE requests still offer
+         both. -->
+    <string name="config_cameraGesturePackage" translatable="false">com.android.MGC_8_9_097</string>
+</resources>
