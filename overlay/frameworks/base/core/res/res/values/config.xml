@@ -77,4 +77,14 @@
          Значение по умолчанию в AOSP — false (frameworks/base/core/res/res/
          values/config.xml:2868). -->
     <bool name="config_device_volte_available">true</bool>
+
+    <!-- Горячая замена SIM. Без этого UiccSlot.onIccSwap() на каждый переход
+         карты ABSENT<->PRESENT показывает «SIM добавлена — перезапустите»
+         (frameworks/opt/telephony UiccSlot.java:453-471); это единственный
+         потребитель флага. Железо и модем замену умеют: сток выставлял
+         ro.mtk_sim_hot_swap=1 (но в framework-res тоже false — там решал
+         MTK-фреймворк), а mtk-ril на +ESIMS: 1,12/1,14/1,9 ставит detectSim,
+         который шлёт RIL_UNSOL_RESPONSE_SIM_STATUS_CHANGED (1019). По умолчанию
+         в AOSP — false (frameworks/base/core/res/res/values/config.xml:1378). -->
+    <bool name="config_hotswapCapable">true</bool>
 </resources>
