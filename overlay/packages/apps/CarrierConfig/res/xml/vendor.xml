@@ -26,4 +26,17 @@
     <carrier_config mcc="250" mnc="02">
         <boolean name="carrier_volte_available_bool" value="true" />
     </carrier_config>
+    <!-- MTS: measured false on b23 (`cmd phone cc get-value -s 0
+         carrier_volte_available_bool`, 2026-09-26) while IMS registered over
+         LTE with 200 OK through the debug override alone. -->
+    <carrier_config mcc="250" mnc="01">
+        <boolean name="carrier_volte_available_bool" value="true" />
+    </carrier_config>
+    <!-- Tele2 and Beeline run VoLTE on their own cores; not measured on m95. -->
+    <carrier_config mcc="250" mnc="20">
+        <boolean name="carrier_volte_available_bool" value="true" />
+    </carrier_config>
+    <carrier_config mcc="250" mnc="99">
+        <boolean name="carrier_volte_available_bool" value="true" />
+    </carrier_config>
 </carrier_config_list>
