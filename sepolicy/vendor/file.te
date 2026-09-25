@@ -229,3 +229,19 @@ type m95_proc_swappiness, fs_type, proc_type;
 # vendor_init tcontext=debugfs. This 3.18 kernel labels debugfs by path
 # (security/selinux/hooks.c:737, SE_SBGENFS), so one file can get a type.
 type m95_debugfs_ged_boost, fs_type, debugfs_type;
+
+##########################
+# 2026-09-25 (perf profile, rootdir/m95-perfprofile.sh). MTK procfs knobs the
+# m95_cpuset patrol writes when persist.vendor.m95.perfprofile=1. Unlabelled
+# they are plain `proc`; typed so the grant does not open all of /proc.
+# /proc/ppm -- MTK PPM (power state pin: policy/hica_power_state).
+type m95_proc_ppm, fs_type, proc_type;
+# /proc/cpufreq -- MTK cpufreq driver (cpufreq_power_mode).
+type m95_proc_cpufreq, fs_type, proc_type;
+# /proc/perfmgr -- MTK touch boost (touch/tb_freq).
+type m95_proc_perfmgr, fs_type, proc_type;
+# /proc/mtkcooler -- per-cooler conditions of the MTK thermal monitor
+# (EXIT hysteresis). thermal_manager writes the same files from the .tp
+# policies; its generic `proc` grant (m95_enforcing.te) moves to this type
+# in thermal.te.
+type m95_proc_mtkcooler, fs_type, proc_type;

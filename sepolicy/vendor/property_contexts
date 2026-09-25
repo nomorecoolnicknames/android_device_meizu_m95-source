@@ -170,3 +170,7 @@ service.ims.                    u:object_r:m95_volte_prop:s0
 # (libm95_camera_metadata_raw). A13 has no platform entry for persist.camera.,
 # so without this they are default_prop.
 persist.camera.                 u:object_r:m95_camera_prop:s0
+
+# Performance profile (property.te m95_perfprofile_prop); the prefix also
+# covers .big and .park.
+persist.vendor.m95.perfprofile  u:object_r:m95_perfprofile_prop:s0

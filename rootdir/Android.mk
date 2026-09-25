@@ -164,6 +164,15 @@ LOCAL_SRC_FILES    := m95-cpuset.sh
 LOCAL_MODULE_PATH  := $(TARGET_OUT_VENDOR_EXECUTABLES)
 include $(BUILD_PREBUILT)
 
+# Sourced by m95-cpuset.sh when persist.vendor.m95.perfprofile=1.
+include $(CLEAR_VARS)
+LOCAL_MODULE       := m95-perfprofile.sh
+LOCAL_MODULE_TAGS  := optional
+LOCAL_MODULE_CLASS := ETC
+LOCAL_SRC_FILES    := m95-perfprofile.sh
+LOCAL_MODULE_PATH  := $(TARGET_OUT_VENDOR_EXECUTABLES)
+include $(BUILD_PREBUILT)
+
 include $(CLEAR_VARS)
 LOCAL_MODULE       := m95-bdaddr.sh
 LOCAL_MODULE_TAGS  := optional

@@ -229,6 +229,7 @@ PRODUCT_PACKAGES += \
     goodixfpd.rc \
     init.m95.bootlog.rc \
     m95-cpuset.sh \
+    m95-perfprofile.sh \
     m95-bdaddr.sh \
     m95-fatal-capture.sh
 
