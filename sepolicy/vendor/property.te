@@ -82,12 +82,7 @@ vendor_internal_prop(m95_handover_prop)
 # grant on every unlabelled property on the device. [CONV]
 vendor_restricted_prop(m95_forge_prop)
 
-# init.svc.volte_{ua,stack,imcb,kicker}. init publishes the readiness of every
-# service under init.svc.<name>; only the vendor./odm. prefixed ones get
-# vendor_default_prop (private/property_contexts:188-189), the rest fall through
-# to default_prop. ForgeImsService polls init.svc.volte_imcb before kicking the
-# modem (A11_BRINGUP_STATE §2r, "звено 8"), so `radio` has to be able to read
-# these four names -- and only these four. [CONV]
+# Allow init to publish service state properties used by the VoLTE startup ordering.
 vendor_restricted_prop(m95_volte_svc_prop)
 
 # MTK vendor telephony/IMS knobs that a CORE process has to read.

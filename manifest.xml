@@ -291,8 +291,8 @@
             <instance>default</instance>
         </interface>
     </hal>
-    <!-- android.hardware.wifi@1.0: declared by the package fragment
-         android.hardware.wifi@1.0-service.xml (vendor22: duplicate entry ->
-         'HAL android.hardware.wifi has a conflict' -> whole manifest rejected,
-         every HAL down; same trap as gatekeeper, see A11_BRINGUP_STATE 2i). -->
+    <!--
+  Avoid duplicate Wi-Fi HAL declarations supplied by installed VINTF fragments.
+-->
+
 </manifest>

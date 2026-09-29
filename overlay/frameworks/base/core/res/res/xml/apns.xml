@@ -40,17 +40,9 @@
          carrier_enabled="true" />
 
     <!--
-        2026-09-26: IMS APN для остальных операторов владельца. HYPOTHESIS:
-        apn="ims" / IP — стандартные значения этих сетей, на этом аппарате не
-        проверены (FACT на №23: без ims-строки для 25062 IMS PDN не запрашивался,
-        mImsMmTelRegistrationState=0 при LTE). Проверка — setupDataCall apn=ims,
-        +CIREGU: 1,1. Если сеть или модем MTK (белый список VoLTE по оператору)
-        не пустит — строки безвредны: IMS просто не зарегистрируется.
-        МТС — FACT 2026-09-26 на №23 (строка apn=ims/IP вставлена в БД вручную):
-        IMS PDN поднят (QCI 5, P-CSCF из PCO), REGISTER → 401 AKA → 200 OK
-        (meizu-fleet/BRINGUP_STATE.md, запись 01:05–01:25). Tele2 и T-Mobile —
-        по-прежнему HYPOTHESIS.
-    -->
+  IMS APNs need carrier-specific validation; APN presence alone does not establish IMS registration.
+-->
+
     <apn carrier="MTS IMS"
          mcc="250"
          mnc="01"

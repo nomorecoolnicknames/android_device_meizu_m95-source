@@ -1,27 +1,8 @@
 <?xml version='1.0' encoding='utf-8' standalone='yes' ?>
 <!--
-    Meizu MX6 (m95) - carrier config overrides, read by CarrierConfig after the
-    per-carrier asset (DefaultCarrierConfigService.java:180-183: "Treat vendor.xml
-    as if it were appended to the carrier config file we read"), filtered on the
-    SIM's MCC/MNC.  There is no MegaFon asset in packages/apps/CarrierConfig, so
-    for 250/02 this block is applied on top of the platform defaults.
-
-    carrier_volte_available_bool: the platform default is false, and on 18.1 it
-    was measured false for 25002 (`dumpsys carrier_config`, A11_BRINGUP_STATE.md
-    section 2r) and then overridden by hand with `cmd phone cc set-value -p`,
-    which lives in /data and is gone after a data wipe.  In the telephony stack
-    its one consumer is ImsManager.isVolteEnabledByPlatform()
-    (frameworks/opt/net/ims ImsManager.java:813-816), which
-    persist.dbg.volte_avail_ovr=1 (system.prop) already short-circuits; stating
-    it here makes the image stop depending on that debug property and makes
-    Settings show the VoLTE switch for the right reason.
-
-    Deliberately NOT set (defaults kept): carrier_vt_available_bool (ViLTE is not
-    ported), carrier_wfc_ims_available_bool (ePDG is off,
-    persist.mtk_epdg_support=0), carrier_supports_ss_over_ut_bool (the port does
-    not carry UT/XCAP), carrier_volte_provisioned_bool (deprecated on Android 13,
-    CarrierConfigManager.java:175-183, UCE only).
+  CarrierConfig overrides load after the carrier assets and must retain that precedence.
 -->
+
 <carrier_config_list>
     <carrier_config mcc="250" mnc="02">
         <boolean name="carrier_volte_available_bool" value="true" />

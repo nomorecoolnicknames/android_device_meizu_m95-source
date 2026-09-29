@@ -1,7 +1,7 @@
 // libm95shim_region — android::Region with the Nougat object layout, for the
 // MT6797 Mali r12p1 EGL driver (libGLES_mali.so, 32 and 64 bit).
 //
-// WHY (FACT, 2026-09-06, A11_BRINGUP_STATE.md §2g): the driver imports exactly
+// ABI requirement: the driver imports exactly
 // seven libui symbols, all android::Region -- ctor, dtor, set(int,int), clear,
 // orSelf(Rect), subtractSelf(Rect), getArray(size_t*) -- and, being a Nougat
 // blob, it also reads the object's fields directly with the N layout:

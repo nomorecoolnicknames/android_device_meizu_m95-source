@@ -1,17 +1,15 @@
-# ReMeizu MX6 / M95 — native Android 13 device source
+# Meizu MX6: LineageOS 20.0
 
-Product integration, compatibility shims, source HALs and board configuration.
+Device configuration, init rules, SELinux policy and compatibility code for Android 13.
+Place this tree at `device/meizu/m95` in the matching LineageOS source tree.
 
-Native LineageOS 20 userdebug has booted on MX6; historical device testing
-observed LTE data and IMS registration. Remaining work includes incoming IMS
-call handling, camera lifecycle and full power/suspend acceptance. This is
-active development, not a stable-ROM release.
+The build requires the referenced common and MediaTek platform trees, matching kernel
+source/headers and prebuilt image where selected, and this board’s proprietary inputs.
+Use `proprietary-files.txt`, dependency manifests and kernel checks provided by this branch.
+Prebuilt firmware and complete ROM images are not supplied by this repository.
 
-- [Source provenance, exclusions and build requirements](PUBLICATION.md)
-- [Original-to-public commit history](PUBLICATION.json)
-- [Verified historical runtime and artifact identities](RUNTIME_SUMMARY.json)
-- [ReMeizu project progress](https://github.com/nomorecoolnicknames/remeizu/blob/codex/progress-and-roadmap-20260929/PROJECT_STATUS.md)
+After providing those inputs, select `lunch lineage_m95-userdebug`.
+These sources remain under development; compiling them does not certify all hardware
+or establish a tested installable release.
 
-This publication performs no new build or hardware test and does not supply
-a complete proprietary-free Android build environment. Existing source licenses
-apply per file; see the publication notes before selecting hosted build inputs.
+Retain the copyright and license notices in individual files.

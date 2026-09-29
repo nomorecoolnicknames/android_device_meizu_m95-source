@@ -1,37 +1,4 @@
-# Fingerprint HAL — Meizu MX6 (m95), LineageOS 18.1.
-#
-# Service name and HIDL instance are unchanged from the LineageOS module this
-# is derived from: goodixfpd.rc restarts "vendor.fps_hal" once the daemon is
-# up, and hwservicemanager starts this interface lazily when FingerprintService
-# first asks for it (seen on 18.1 as "Since ...IBiometricsFingerprint/default
-# is not registered, trying to start it as a lazy HAL").
-#
-# class late_start, not hal: upstream's comment about a /data race applies here
-# too, and this HAL is useless before goodixfingerprintd (class main) exists.
-#
-# group: system input uhid as upstream, plus nothing else — /dev/goodix_fp is
-# owned by the daemon, not by this process.
-#
-# LAZY, NOT AUTOSTARTED (2026-09-07). "disabled" is kept deliberately, and it
-# is not a leftover of the crash-loop lockdown: with the "interface" line
-# present hwservicemanager starts this service the moment FingerprintService
-# asks for IBiometricsFingerprint/default, which happens well after
-# goodixfingerprintd (class main) is up. That removes the openHal() race the
-# goodixfpd.rc self-heal stanza existed for, and it keeps a regression in the
-# blob from turning into a boot-time crash loop: the process can only be
-# started by a framework request or by hand.
-#
-# The crash this replaced: /vendor/lib64/hw/fingerprint.default.so died inside
-# its own open() every 5 s —
-#   signal 11 (SIGSEGV), fault addr 0x0, uid 1000
-#   #00 fingerprint.default.so (getService()+416)   <- ldr x0,[x22], x22 == 0
-#   #01 fingerprint.default.so (open+...)
-#   #02 ...m95 (BiometricsFingerprint::openHal()+144)
-# — because libgoodixfingerprintd_binder.so builds android::Parcel objects on
-# the stack with Nougat's sizeof(Parcel) == 104 while R's is 120.
-# tools/blobpatch/goodix_binder_parcel_frames.py widens those 43 frames; see
-# A11_BRINGUP_STATE.md §2s for the per-function proof that the Parcel is the
-# topmost sp-relative object in every one of them.
+# The fingerprint HAL uses the stock Binder/Parcel ABI; keep its compatibility adapter isolated from platform libbinder.
 service vendor.fps_hal /vendor/bin/hw/android.hardware.biometrics.fingerprint@2.0-service.m95
     interface android.hardware.biometrics.fingerprint@2.1::IBiometricsFingerprint default
     class late_start

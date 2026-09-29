@@ -69,17 +69,7 @@ PRODUCT_PACKAGES += \
     vulkan.mt6797_symlinks \
     librilimp
 
-# RIL instance-unification, as on 18.1 (A11_BRINGUP_STATE.md §2m,
-# SIM_LANE_STATE.md).  Our patched libril is emitted a second time under the
-# soname the vendor blob already needs, librilmtk.so, so mtk-ril.so's
-# RIL_onRequestComplete binds to OUR pending-request list; rild links it
-# instead of libril.  librilimp (above) is the stock MTK libril, renamed, for
-# the 11 modem-internal symbols we do not implement.  64-bit only.  The module
-# comes from hardware/ril branch meizu-legacy-vendor under
-# BOARD_USES_MTK_LEGACY_RIL (BoardConfig.mk); rild would pull it in anyway,
-# the name here documents the dependency.  It does NOT make a tree without
-# that branch fail (PRODUCT_ENFORCE_PACKAGES_EXIST is not set): the guard for
-# that is the $(error) next to the flag in BoardConfig.mk.
+# The MTK RIL wrapper must match the vendor RIL symbol and request ownership contracts.
 PRODUCT_PACKAGES += \
     librilmtk
 

@@ -1,37 +1,4 @@
-# init.m95.modem.rc — Meizu MX6 (m95), MT6797 modem bring-up:
-# md1 (GSM/WCDMA/LTE) + md3 (C2K/CDMA).
-#
-# The MX6 is full-netcom: ro.mtk_c2k_support=1, ro.mtk_enable_md3=1,
-# ril.external.md=0, mtk.eccci.c2k=enabled [DEV: stock Flyme 8.0.5.0A
-# system build.prop], and the md1img/md1dsp/md1arm7/md3img partitions exist
-# on device [DEV: sepolicy file_contexts, scatter]. C2K runs over the
-# integrated CCCI (eccci), not the legacy VIA SDIO path.
-#
-# SERVICE NAMES ARE LOAD-BEARING — the daemons chain-start each other via
-# hardcoded ctl.start property values [FACT: strings on the m95 blobs]:
-#   ccci_mdinit  -> "ccci_fsd", "gsm0710muxd", "gsm0710muxdmd2"
-#   gsm0710muxd  -> "ril-daemon-mtk"
-#   rc trigger   -> "ril-proxy" on ril.rilproxy=1 [DEV: stock init.rilproxy.rc:51]
-# Do not rename services in this file.
-#
-# Socket layout follows stock's EFFECTIVE config: stock defines ril-daemon-mtk
-# TWICE (init.modem.rc:67 with rild* sockets; init.rilproxy.rc:26 with mrild*
-# sockets). init.rilproxy.rc is imported first (stock init.mt6797.rc:8 vs :20),
-# so init rejected the init.modem.rc duplicate and the C2K/rilproxy layout —
-# ril-proxy owns sockets rild..rild4, mtkrild owns mrild* — is what actually
-# ran on this device. librilproxy.so contains rild/rild2/rild3/rild4 and
-# librilmtk.so contains mrild/mrild2 [FACT: strings], consistent with that.
-#
-# RESOLVED 2026-08-09 (this comment previously called the framework<->RIL
-# bridge an unsolved work item; that is no longer true). Pie telephony works
-# through the HIDL path and the socket path is vestigial. Measured on the
-# booted device [FACT, HANDOFF_NEXT_REVIEW.md §4.1]:
-#   lshal          -> android.hardware.radio@1.0::IRadio/slot1 and /slot2
-#                     registered by rild, with system_server as their client
-#   gsm0710muxd    -> "Frames received/dropped: 430/0"
-#   rild           -> "AT> AT+EFUN=1" / "AT< OK", "AT> AT+CPIN?"
-#   /proc/net/unix -> every rild*/mrild* socket is state 01, no peer connected
-# So RILJ never opens a unix socket here: it speaks IRadio to ril-daemon-mtk.
+# Preserve md1/md3 modem startup ordering and the board full-network configuration.
 
 on post-fs-data
     # gsm0710muxd symlinks its pty slaves to /dev/radio/ptty* and mtk-ril
@@ -181,33 +148,7 @@ service ril-daemon-mtk /vendor/bin/hw/rild -l mtk-ril.so
     user root
     group radio cache inet misc audio sdcard_r sdcard_rw log system
     disabled
-    # NO `oneshot` — deliberate divergence from stock (stock/m681-template
-    # init.rilproxy.rc:52 marks mtkrild oneshot).
-    #
-    # Stock can afford oneshot because MTK's only expected rild death is a
-    # modem exception, and ccci_mdinit re-issues ctl.start after it restarts
-    # the MD [FACT: strings -a vendor/bin/ccci_mdinit -> "ctl.stop",
-    # "ctl.start", "ril-daemon-mtk", "check_to_restart_md kill ril-proxy"].
-    # Our rild dies for a *software* reason instead (see BLOB_SHIMS /
-    # HANDOFF: mtk-ril.so calls s_rilenv->[+32] and ->[+40], which are past
-    # the end of AOSP Pie's 32-byte struct RIL_Env, so it does `blr 0`
-    # [FACT: tombstone_09 pc=0 at onUsimDetected+720; disassembly of
-    # vendor/lib64/mtk-ril.so 0x92d34-0x92d38]). No MD exception happens, so
-    # ccci_mdinit never restarts it.
-    #
-    # With `oneshot`, init's Reap() sets SVC_DISABLED and never restarts:
-    # observed live 2026-08-09 after 12 h uptime — init.svc.ril-daemon-mtk
-    # =stopped, no /dev/socket/mrild* (Reap unlinks them via
-    # SocketInfo::Clean, system/core/init/descriptors.cpp:78), no IRadio in
-    # lshal, 433 "RILJ: RadioProxy getService ... NoSuchElementException".
-    # Telephony was unrecoverable for the whole session.
-    #
-    # AOSP's own rild.rc has no oneshot, and the copy of the SAME binary that
-    # actually ships in /vendor/etc/init/rild.legacy.rc on this device is
-    # `class main` with no oneshot either. Match that: a rild crash must be
-    # survivable. NOTE: until the RIL_Env fix lands this turns one fatal
-    # crash into a ~5 s restart loop — that is intentional and louder, not
-    # quieter.
+# Do not mark mtkrild oneshot: init must restart the daemon after a crash.
 
 # [DEV: stock init.modem.rc:91-108] md2 RIL — same "defined but disabled"
 # rationale as gsm0710muxdmd2. (Stock declares socket rild-vsim-md2 twice;
@@ -250,26 +191,7 @@ service ril-proxy /vendor/bin/rilproxy -l mtk-rilproxy.so
     disabled
     oneshot
 
-# NOT STARTED — deliberately. Stock's ril-proxy bridges the framework's unix
-# sockets to mtkrild; our layout runs neither side of that bridge, so the
-# daemon spends its whole life failing to connect to a peer that does not
-# exist. Measured 2026-08-09 [FACT, HANDOFF_NEXT_REVIEW.md §4.4]:
-#   logcat -b radio -> "connectSocket fail, try again -1" once a second,
-#                      forever — ~3600 wasted log lines an hour
-#   ps -A           -> only gsm0710muxd, rild and rilproxy exist; no mtkrild
-#   /proc/net/unix  -> mrild/mrild2 have flags 00000000, i.e. never listened
-#                      on, because mtkrild never ran to listen on them
-#   /proc/net/unix  -> nothing is connected to rild/rild2/rild3/rild4 or
-#                      sap_uim_socket*, the sockets ril-proxy itself owns
-# Keeping the service *defined* (above) costs nothing and documents stock's
-# layout; starting it only produces noise. The sockets it declares vanish
-# with it, which is safe precisely because no peer ever connected to them.
-#
-# Re-enable this trigger if mtkrild is ever brought up, or if BT SIM Access
-# Profile is needed — SAP is what sap_uim_socket* are for.
-#
-# on property:ril.rilproxy=1
-#     start ril-proxy
+# Do not start the unused rilproxy daemon; its disconnected socket loop consumes CPU.
 
 # C2K RIL. With eccci C2K (ril.external.md=0) the SDIO tty argument is
 # vestigial, but the cmdline is kept verbatim from stock. Library verified

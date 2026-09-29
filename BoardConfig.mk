@@ -1,19 +1,5 @@
-#
-# BoardConfig.mk — Meizu MX6 (m95, MT6797) on LineageOS 20 (Android 13, SDK 33).
-#
-# Provenance of every non-obvious value is recorded in
-# meizu-fleet/trees/M95_LOS20_TREE.md (FACT / INFERENCE / HYPOTHESIS per
-# <original-workspace>/CLAUDE.md §2).  Short form:
-#   * boot geometry, partition table, panel, input names  -> DEVICE_FACTS.md
-#     (byte-for-byte vs the stock boot.img / stock scatter / live device);
-#   * Treble + real /vendor on `custom` (mmcblk0p3)       -> the LOS 18.1 tree
-#     device-18.1/meizu/m95 that actually booted this device;
-#   * VNDK 30                                            -> the vendor image
-#     this port already ships (ro.vndk.version=30) and under which the
-#     Android 13 GSI reached the launcher on this handset (2026-09-11).
-#
 # SPDX-License-Identifier: Apache-2.0
-#
+# BoardConfig.mk — Meizu MX6 (m95, MT6797) on LineageOS 20 (Android 13, SDK 33).
 
 DEVICE_PATH := device/meizu/m95
 
@@ -176,17 +162,7 @@ BOARD_KERNEL_CMDLINE += androidboot.selinux=permissive
 # /sys/kernel/debug/tracing/buffer_size_kb = 1024.
 BOARD_KERNEL_CMDLINE += slub_debug=- lockdep.prove_locking=0 dma_debug=off trace_buf_size=1M
 
-# ---------------------------------------------------------------------------
-# Partitions — A-only, no slots, no dynamic partitions.
-# ---------------------------------------------------------------------------
-# Sizes below come from the stock GPT
-# (captures/a11-20260909/device-session/gpt/gpt-m95-before-20260911.bin,
-# parsed: recovery 30 MiB, custom 512 MiB, boot 16 MiB, cache 432 MiB)
-# EXCEPT `system`, which was grown from 2560 MiB to 4 GiB with sgdisk on
-# 2026-09-11 (FLYME13_KERNEL_PLAN.md §10, HANDOFF_20260911_BPF_AUDIO_NET.md §0).
-# The post-resize GPT was never captured, so 4294967296 is the documented size,
-# not a measured one — verify with `sgdisk -p /dev/block/mmcblk0` from TWRP
-# before trusting a full-size image.
+# MX6 uses its board-specific A-only partition map; do not substitute another MTK board geometry.
 BOARD_BOOTIMAGE_PARTITION_SIZE := 16777216
 BOARD_RECOVERYIMAGE_PARTITION_SIZE := 31457280
 BOARD_SYSTEMIMAGE_PARTITION_SIZE := 4294967296
