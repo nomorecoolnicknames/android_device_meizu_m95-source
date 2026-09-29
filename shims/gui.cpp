@@ -110,7 +110,9 @@ void _ZN7android13GraphicBufferC1EPK13native_handleNS0_16HandleWrapMethodEjjijyj
 // imported dup), WRAP_HANDLE otherwise. TAKE_HANDLE would double-free.
 void _ZN7android13GraphicBufferC1EP19ANativeWindowBufferb(
         android::GraphicBuffer* self, struct m95_anwb* buffer, bool keepOwnership) {
-    enum { WRAP_HANDLE = 0, CLONE_HANDLE = 1 };
+    // Values of R/T GraphicBuffer::HandleWrapMethod (GraphicBuffer.h:98-129):
+    // WRAP 0, TAKE 1, TAKE_UNREGISTERED 2, CLONE 3. 1 here used to be TAKE.
+    enum { WRAP_HANDLE = 0, CLONE_HANDLE = 3 };
     uint64_t usage = buffer->usage ? buffer->usage
                                    : (uint64_t)(uint32_t)buffer->usage_deprecated;
     M95_GB_WRAP(self, buffer->handle, keepOwnership ? CLONE_HANDLE : WRAP_HANDLE,
