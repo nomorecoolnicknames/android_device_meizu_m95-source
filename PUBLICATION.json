@@ -104,6 +104,181 @@
   "standalone_proprietary_free_build_proven": false,
   "exclusions_or_redactions": [
     {
+      "original_commit": "c754d9e21237904690db29bcbca0360cd9d6f46d",
+      "path": "BoardConfig.mk",
+      "source_blob": "d5e5b7f79a72acd34a7350e98e5daf35124b7380",
+      "source_sha256": "3eeb7665cfb33b5d09ed6ad1339873e1adf394f286670f085e6951966caec187",
+      "reason": "Private host paths or factory-address comment redacted; executable source unchanged."
+    },
+    {
+      "original_commit": "c754d9e21237904690db29bcbca0360cd9d6f46d",
+      "path": "configs/public.libraries-meizu.txt",
+      "source_blob": "24d466ea48a75349d6ff1eedee5fa011f5e9c7f7",
+      "source_sha256": "ea5c05bb46cf06133986da45764588b33ef6e1498e90b3ce2268f31a46a91768",
+      "reason": "Prebuilt binary or stock-derived configuration payload omitted pending separate redistribution provenance."
+    },
+    {
+      "original_commit": "c754d9e21237904690db29bcbca0360cd9d6f46d",
+      "path": "configs/public.libraries-vendor.txt",
+      "source_blob": "ab1d419e24a5c6a6586bc816bd1784639be5dc93",
+      "source_sha256": "57fc661cb2be402b355f201ee48842e140896de9147bfebe3050ba98738434a2",
+      "reason": "Prebuilt binary or stock-derived configuration payload omitted pending separate redistribution provenance."
+    },
+    {
+      "original_commit": "c754d9e21237904690db29bcbca0360cd9d6f46d",
+      "path": "gcam/fetch-gcam.sh",
+      "source_blob": "48fe941ef20e6d08eea5b7d146c58c2cb815ed5f",
+      "source_sha256": "790d30bb1852eb934fbcecc2700a81f0f6c06d148adb04f94f51ebea6093550a",
+      "reason": "Private-host optional APK staging helper omitted; optional APK not distributed."
+    },
+    {
+      "original_commit": "c754d9e21237904690db29bcbca0360cd9d6f46d",
+      "path": "keylayout/ACCDET.kl",
+      "source_blob": "0151a9cf2509d2177f3740d8eadce30de88fc9aa",
+      "source_sha256": "b60b20867f30b2cf3ec8908930aec439290ebd7ba151d144e6f1e46146c03e7c",
+      "reason": "Prebuilt binary or stock-derived configuration payload omitted pending separate redistribution provenance."
+    },
+    {
+      "original_commit": "c754d9e21237904690db29bcbca0360cd9d6f46d",
+      "path": "keylayout/fp-keys.kl",
+      "source_blob": "fbb023c7690d42fe6037b834d22459a93f8178b8",
+      "source_sha256": "b005d078fdd47e201eb4b949393e0ffce15ee5df348ed59483e52a2ce743d2a0",
+      "reason": "Prebuilt binary or stock-derived configuration payload omitted pending separate redistribution provenance."
+    },
+    {
+      "original_commit": "c754d9e21237904690db29bcbca0360cd9d6f46d",
+      "path": "keylayout/mtk-kpd.kl",
+      "source_blob": "10c41a7e07a0ce398af29900d72332d748a7e462",
+      "source_sha256": "daaa5357df4868ab71309417bd21207882d1519973a237b0fc2440d55813d918",
+      "reason": "Prebuilt binary or stock-derived configuration payload omitted pending separate redistribution provenance."
+    },
+    {
+      "original_commit": "c754d9e21237904690db29bcbca0360cd9d6f46d",
+      "path": "media/media_codecs.xml",
+      "source_blob": "6487008490aed733d36cfd90a82705d7f876c009",
+      "source_sha256": "612b104c24adad7a46497697296adfca0428b35431d5e8bd945bede650611603",
+      "reason": "Prebuilt binary or stock-derived configuration payload omitted pending separate redistribution provenance."
+    },
+    {
+      "original_commit": "c754d9e21237904690db29bcbca0360cd9d6f46d",
+      "path": "media/media_codecs_google_audio.xml",
+      "source_blob": "1a13820f76832d161b287adc6dcc07d41fb2bb17",
+      "source_sha256": "f26a19eeeb1f490bb83511ab0cf0360b066265b2825943f8b713aa7627b6f8a2",
+      "reason": "Prebuilt binary or stock-derived configuration payload omitted pending separate redistribution provenance."
+    },
+    {
+      "original_commit": "c754d9e21237904690db29bcbca0360cd9d6f46d",
+      "path": "media/media_codecs_google_video_le.xml",
+      "source_blob": "cce042e035445f94dd71cd826263fbe34b5ca661",
+      "source_sha256": "9a4ca3e7ce084045d953b8db66ef2dfeb359250451bd298ed4d0aa899da80c44",
+      "reason": "Prebuilt binary or stock-derived configuration payload omitted pending separate redistribution provenance."
+    },
+    {
+      "original_commit": "c754d9e21237904690db29bcbca0360cd9d6f46d",
+      "path": "media/media_codecs_mediatek_audio.xml",
+      "source_blob": "f654697161aeac02ffcff1ff608fa2432d1e2fec",
+      "source_sha256": "7c435711545c893b34ebb76848440f678e860e9dda53276c82f1f0c83352d3ae",
+      "reason": "Prebuilt binary or stock-derived configuration payload omitted pending separate redistribution provenance."
+    },
+    {
+      "original_commit": "c754d9e21237904690db29bcbca0360cd9d6f46d",
+      "path": "media/media_codecs_mediatek_video.xml",
+      "source_blob": "337d531b7b6402229ae014cec5d5e6618a06d0c1",
+      "source_sha256": "16b787bd7b53025cd39ed33ca93720623e4e8b52a216beaf00f4a65ed2188ab5",
+      "reason": "Prebuilt binary or stock-derived configuration payload omitted pending separate redistribution provenance."
+    },
+    {
+      "original_commit": "c754d9e21237904690db29bcbca0360cd9d6f46d",
+      "path": "media/media_codecs_performance.xml",
+      "source_blob": "5ef214e28c5579cc88d837285894b1c2e35d2702",
+      "source_sha256": "67233bc9f04ea59d2646d2798d2b06cc2617de5c300c008af0f76df4c193d9fe",
+      "reason": "Prebuilt binary or stock-derived configuration payload omitted pending separate redistribution provenance."
+    },
+    {
+      "original_commit": "c754d9e21237904690db29bcbca0360cd9d6f46d",
+      "path": "media/media_profiles.xml",
+      "source_blob": "a9e7df0716ecf8839c356293cfd7af77a6025286",
+      "source_sha256": "83fee79ff08728954310b63bbdc804258526fea700ac92c6ff6a8ea5a84f9279",
+      "reason": "Prebuilt binary or stock-derived configuration payload omitted pending separate redistribution provenance."
+    },
+    {
+      "original_commit": "c754d9e21237904690db29bcbca0360cd9d6f46d",
+      "path": "prebuilt/Image.gz-dtb",
+      "source_blob": "ec53b1a86b9b77ae9ba0fff3a222640210bad6af",
+      "source_sha256": "b84b732d3d0e9dbb13d3a3e6e75d0fdae69e2c628cc31be048dfa881d824da7e",
+      "reason": "Prebuilt binary or stock-derived configuration payload omitted pending separate redistribution provenance."
+    },
+    {
+      "original_commit": "c754d9e21237904690db29bcbca0360cd9d6f46d",
+      "path": "prebuilt/hals.conf",
+      "source_blob": "82e4e6dd8d3b0e6b7834755bf9a2123efe8978e4",
+      "source_sha256": "58ef63e9395b5420c2eb3f8e42a4362abd3f9b5b3f50621441d7fda53362f7ef",
+      "reason": "Prebuilt binary or stock-derived configuration payload omitted pending separate redistribution provenance."
+    },
+    {
+      "original_commit": "c754d9e21237904690db29bcbca0360cd9d6f46d",
+      "path": "prebuilt/tfa98xx.cnt",
+      "source_blob": "a5637b66a09df76936b6bbb7f56f188f2721cc76",
+      "source_sha256": "590e99482aba982925102d33617014b3f41af408f5696f649b2c88e3214f5177",
+      "reason": "Prebuilt binary or stock-derived configuration payload omitted pending separate redistribution provenance."
+    },
+    {
+      "original_commit": "c754d9e21237904690db29bcbca0360cd9d6f46d",
+      "path": "proprietary-files.txt",
+      "source_blob": "f55becd12ded851bfaa4ac71c032d787d3d9023c",
+      "source_sha256": "d25021c12f4aaead55b368a247bc333117741ee56d6f698d842fab9d2060576f",
+      "reason": "Private host paths or factory-address comment redacted; executable source unchanged."
+    },
+    {
+      "original_commit": "c754d9e21237904690db29bcbca0360cd9d6f46d",
+      "path": "rootdir/fstab.mt6797",
+      "source_blob": "0d7c868dd66a4e7f5a1471b18b65667dc62b797a",
+      "source_sha256": "13ce25a613216faee7a7ab3ce6c83a69f2101f2a43c9c279f7b39092ff2c83d3",
+      "reason": "Prebuilt binary or stock-derived configuration payload omitted pending separate redistribution provenance."
+    },
+    {
+      "original_commit": "c754d9e21237904690db29bcbca0360cd9d6f46d",
+      "path": "rootdir/goodixfpd.rc",
+      "source_blob": "47734dd4bca744027f8bc43b9bfaee522e6d732d",
+      "source_sha256": "9a0aa24041e86fd246ddd071446b0a3d8e196e96a55f34b740cd1ea8b34ca924",
+      "reason": "Prebuilt binary or stock-derived configuration payload omitted pending separate redistribution provenance."
+    },
+    {
+      "original_commit": "c754d9e21237904690db29bcbca0360cd9d6f46d",
+      "path": "rootdir/init.mt6797.rc",
+      "source_blob": "7e36313c6f0e3791a44799e8afbc54dbc3857370",
+      "source_sha256": "f9332d9827d2eeec07d8ea27aa8fd896faa4112cd132f0cf0e0ed04abc69da36",
+      "reason": "Prebuilt binary or stock-derived configuration payload omitted pending separate redistribution provenance."
+    },
+    {
+      "original_commit": "c754d9e21237904690db29bcbca0360cd9d6f46d",
+      "path": "rootdir/init.mt6797.usb.rc",
+      "source_blob": "ca8f46ae5f96ec40d1f2d1147e1e6d333f6ad2a8",
+      "source_sha256": "407598a546bf83a28d876a440bb89743ae59ba0588fca5de6e9f6fb627f8896b",
+      "reason": "Prebuilt binary or stock-derived configuration payload omitted pending separate redistribution provenance."
+    },
+    {
+      "original_commit": "c754d9e21237904690db29bcbca0360cd9d6f46d",
+      "path": "rootdir/m95-bdaddr.sh",
+      "source_blob": "fc3f3d99877cf0b1f05b54d2a4e10a1a0fe57de5",
+      "source_sha256": "c1ebfc2747024008f9e88754cb0cfdb0fe53217708e12297688a47d3247d01e7",
+      "reason": "Private host paths or factory-address comment redacted; executable source unchanged."
+    },
+    {
+      "original_commit": "c754d9e21237904690db29bcbca0360cd9d6f46d",
+      "path": "rootdir/ueventd.mt6797.rc",
+      "source_blob": "4c2dc8fd7412ba66c8332cbc4fb8fccbdabef798",
+      "source_sha256": "dfc29149742d697c9a5b27577fd0acc50bd9107d4ad182f10ea36d4dee68fbc6",
+      "reason": "Prebuilt binary or stock-derived configuration payload omitted pending separate redistribution provenance."
+    },
+    {
+      "original_commit": "c754d9e21237904690db29bcbca0360cd9d6f46d",
+      "path": "sepolicy/vendor/hal_camera_default.te",
+      "source_blob": "c8855b168e2aeffae2a469489fc442db92aeda74",
+      "source_sha256": "bbfbb26a78eca37d090efc5159b7276d5670a5224a130814cab2d6438585c47b",
+      "reason": "Private host paths or factory-address comment redacted; executable source unchanged."
+    },
+    {
       "original_commit": "0420a7de3e7c2fb38101c31c87051ceb95bd8db5",
       "path": "BoardConfig.mk",
       "source_blob": "69f58bbd47dac6aeb6a57c7ff1c41506b85479d5",
