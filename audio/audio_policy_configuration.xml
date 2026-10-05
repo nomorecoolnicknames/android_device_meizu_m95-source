@@ -1,52 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<!-- Audio policy configuration for the Meizu MX6 (m95, MT6797).
 
-     Converted from the stock Nougat /vendor/etc/audio_policy.conf
-     (vendor-18.1/meizu/m95/proprietary/vendor/etc/audio_policy.conf, 186 lines).
-     Android 10 dropped the legacy .conf parser - only Serializer.cpp for XML is
-     left in frameworks/av/services/audiopolicy - so without this file
-     AudioPolicyManager::loadConfig() falls back to getConfig().setDefault().
-
-     Measured on the device before this file existed (2026-09-07, verify lane,
-     build eng.n8n.20260907.101352):
-
-       $ adb shell dumpsys media.audio_policy
-        Config source: AudioPolicyConfig::setDefault
-       - Available output devices:          <- empty
-       - Available input devices:           <- empty
-       D APM_AudioPolicyManager: setVolumeCurveIndex: wrong index 1 min=0 max=0
-
-     That single fallback caused two unrelated-looking failures at once:
-       * every stream had an empty volume range (Min: 0 Max: 0), so setting the
-         music stream volume to 15 was refused with "should be in [0..0]";
-       * audio recording was impossible - AudioRecord::start returned -38
-         (INVALID_OPERATION) from AudioFlinger "startInput failed", even though
-         the HAL input opened fine (openInputStream status = 0x0) and the AAC
-         encoder was created successfully.
-
-     Fidelity notes, so the next reader does not have to diff against the stock
-     file by hand:
-
-     * halVersion 3.0 matches "audio_hal_version 3.0" in the stock conf for the
-       primary module (a2dp/usb/r_submix are 2.0 there and come from the AOSP
-       include files instead).
-     * AUDIO_DEVICE_IN_MATV from the stock input list is DELIBERATELY DROPPED:
-       it is a MediaTek extension and does not exist in Android 11
-       (system/media/audio/include/system/audio-base.h has no such enum). An
-       unknown name makes the serializer reject the whole file, which would put
-       us straight back on setDefault.
-     * Two stock names are written here in their canonical Android 11 spelling,
-       because the runtime string table (AUDIO_DEVICE_IN_ALL_ARRAY in
-       system/media/audio/include/system/audio-base-utils.h) only carries the
-       canonical form, and an unmatched string fails the parse:
-         AUDIO_DEVICE_IN_VOICE_CALL   -> AUDIO_DEVICE_IN_TELEPHONY_RX
-         AUDIO_DEVICE_IN_AUX_DIGITAL  -> AUDIO_DEVICE_IN_HDMI
-         AUDIO_DEVICE_OUT_AUX_DIGITAL -> AUDIO_DEVICE_OUT_HDMI
-       All three are plain aliases in audio-base.h (identical numeric values
-       0x80000040, 0x80000020 and 0x400), so nothing about the routing changes.
-     * Everything else - device lists, sampling rates, channel masks, formats and
-       the headset/headphone/primary gain ranges - is carried over verbatim.
--->
 
 <audioPolicyConfiguration version="1.0" xmlns:xi="http://www.w3.org/2001/XInclude">
     <globalConfiguration speaker_drc_enabled="true"/>

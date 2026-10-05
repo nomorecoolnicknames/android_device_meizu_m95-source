@@ -45,51 +45,7 @@ using ::android::hardware::hidl_vec;
 using ::android::hardware::hidl_string;
 using ::android::sp;
 
-/*
- * ---------------------------------------------------------------------------
- * m95: the Goodix module's device structure is 32 bytes LONGER than AOSP's.
- * ---------------------------------------------------------------------------
- *
- * FACT (llvm-objdump of vendor/lib64/hw/fingerprint.default.so, the module's
- * own open() at 0x1608, re-verified on the 18.1 blob copy 2026-09-07):
- *
- *   1640: mov  x0, x21          ; x21 = #272
- *   1644: bl   malloc           ; the whole structure is 0x110 = 272 bytes
- *   ...   str/stur into x22 at offsets
- *         0, 8, 112, 120(=0), 128, 136, 144, 152, 160, 168, 176, 184,
- *         192, 200, 216, 224, 232          (208 is left NULL by the memset)
- *
- * AOSP's fingerprint_device_t is 240 bytes here (hw_device_t is 120 on LP64
- * because hardware.h declares uint64_t reserved[12] under __LP64__), so every
- * member from get_authenticator_id onwards sits 32 bytes further along than
- * <hardware/fingerprint.h> believes.
- *
- * The four inserted members are the vendor methods, and they name themselves:
- * each one logs through __android_log_print with a literal from .rodata
- *
- *   offset 160 -> 0x1A30 "fingerprint_lockout_reset"  (daemon vtable +176)
- *   offset 168 -> 0x1AD0 "fingerprint_lockout"        (daemon vtable +184)
- *   offset 176 -> 0x1B70 "fingerprint_screen_off"     (daemon vtable +200)
- *   offset 184 -> 0x1C10 "fingerprint_screen_on"      (daemon vtable +192)
- *
- * and the standard members identify themselves by shape:
- *   offset 224 -> 0x1E60 is the only one that does __strlen_chk + memcpy of a
- *                 string, i.e. set_active_group(dev, gid, store_path);
- *   offset 232 -> 0x1F50 keeps a 64-bit x1 and a w2, i.e.
- *                 authenticate(dev, operation_id, gid);
- *   offset 128 -> 0x1FF0 is four instructions: str x1,[x0,#120]; ret 0 —
- *                 set_notify, and it stores the callback at 120, which pins
- *                 the notify member (and therefore hw_device_t's size) exactly.
- *
- * Compiled against <hardware/fingerprint.h> this wrapper therefore called
- * cancel whenever it meant authenticate, screen_off whenever it meant
- * enumerate, and lockout_reset whenever it meant get_authenticator_id. That is
- * why matching never captured a frame on LOS 16.0: the daemon received a
- * cancel. Enrolment worked because everything up to post_enroll agrees.
- *
- * Slot 208 (enumerate) is NULL in this blob — the memset leaves it zero and
- * open() never writes it. enumerate() below must not call through it.
- */
+
 typedef struct meizu_fingerprint_device {
     /** 0 .. 119 */
     struct hw_device_t common;

@@ -18,8 +18,9 @@
 # userspace loop can do better than mitigate this, and what the real fix is.
 
 service m95_cpuset /vendor/bin/sh /vendor/bin/m95-cpuset.sh
-    # Explicit domain: this service runs /system/bin/sh, and a file-context
-    # transition cannot serve three scripts that share one executable.
+    # Explicit domain: the executable is the shared vendor shell, and a
+    # file-context transition cannot give each script its own domain
+    # (sepolicy/vendor/m95_scripts.te).
     seclabel u:r:m95_cpuset:s0
     class core
     user root

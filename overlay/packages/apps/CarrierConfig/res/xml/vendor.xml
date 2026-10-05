@@ -1,15 +1,10 @@
 <?xml version='1.0' encoding='utf-8' standalone='yes' ?>
-<!--
-  CarrierConfig overrides load after the carrier assets and must retain that precedence.
--->
 
 <carrier_config_list>
     <carrier_config mcc="250" mnc="02">
         <boolean name="carrier_volte_available_bool" value="true" />
     </carrier_config>
-    <!-- MTS: measured false on b23 (`cmd phone cc get-value -s 0
-         carrier_volte_available_bool`, 2026-09-26) while IMS registered over
-         LTE with 200 OK through the debug override alone. -->
+
     <carrier_config mcc="250" mnc="01">
         <boolean name="carrier_volte_available_bool" value="true" />
     </carrier_config>

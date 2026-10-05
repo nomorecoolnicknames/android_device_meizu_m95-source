@@ -198,13 +198,13 @@ dontaudit wmt_loader self:capability dac_override;
 # no-at-secure flag.
 # R-SPLIT: noatsecure has no exemption (init.te:617). Scripts need no
 # LD_PRELOAD; plain transition set suffices under permissive.
-allow init { m95_cpuset m95_bdaddr m95_fatal_capture }:process
+allow init { m95_cpuset m95_bdaddr }:process
     { transition rlimitinh siginh };
 
-# the scripts themselves live in the ramdisk root
-allow m95_cpuset rootfs:file { read open getattr };
-allow m95_bdaddr rootfs:file { read open getattr };
-allow m95_fatal_capture rootfs:file { read open getattr };
+# The scripts are read by the shell from /vendor/bin (vendor_file). They lived
+# in the ramdisk root on Pie/R, hence the rootfs grants that stood here.
+# m95_cpuset has vendor_file read in m95_scripts.te (perf profile block).
+allow m95_bdaddr vendor_file:file r_file_perms;
 
 # composer is a vendor service and uses /dev/vndbinder, like the DRM and GNSS
 # HALs already allowed above
@@ -411,11 +411,6 @@ set_prop(rild, mtk_md_prop)
 # to resolve a path, not to enumerate or open anything here.
 allow rild block_device:dir search;
 
-# ccci_mdinit publishes modem status for the framework.
-# 2026-09-24 (A13): set_prop(ccci_mdinit, net_radio_prop) removed -- a
-# neverallow on A13 (public/property.te:101, private/property.te:57/162).
-# The one name it sets there, net.cdma.mdmstat, is relabelled mtk_md_prop in
-# property_contexts; ccci_mdinit already sets that type (modem_daemons.te).
 
 # vendor_init tries to apply the dexopt policy out of /vendor/build.prop and is
 # refused. domain.te:547 neverallows it, and unlike the WMT case this one is
@@ -591,14 +586,6 @@ get_prop(surfaceflinger, m95_pq_prop)
 # the waitFramedone failures survive the fix.
 set_prop(mediacodec, m95_pq_prop)
 
-##############################################################################
-# Round 24 (2026-09-09) — first denial census taken on 18.1 itself.
-#
-# Source: captures/a11-20260906/lastkmsg-v{6,7}.txt and lastkmsg-panic1.txt,
-# the kernel audit of three A11 boots. Only the kernel ring was captured, so
-# this list is short by construction: service_manager and property denials go
-# to logcat only (see the note in pq.te) and are still uncensused on 18.1.
-##############################################################################
 
 # The camera provider opens /dev/vndbinder. FACT (three boots, two inodes):
 #   avc: denied { open read write ioctl } path="/dev/vndbinder"

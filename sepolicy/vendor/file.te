@@ -20,6 +20,7 @@ type stpwmt_device, dev_type;
 type wmtdetect_device, dev_type;
 type wmtWifi_device, dev_type;
 type stpbt_device, dev_type;
+type spm_device, dev_type;
 type stpgps_device, dev_type;
 type fm_device, dev_type;
 type ccci_device, dev_type;
@@ -75,6 +76,7 @@ type sysfs_ccci, fs_type, sysfs_type;
 type sysfs_meizu, fs_type, sysfs_type;
 # [CONV] m681-template dev_info sysfs node, unverified on m95.
 type sysfs_dev_info, fs_type, sysfs_type;
+type sysfs_fw_class_path, fs_type, sysfs_type;
 
 ##########################
 # Executables (domains declared in their own .te files)
@@ -184,9 +186,9 @@ type proc_mtk_thermal, fs_type, proc_type;
 type mtkmal_socket, file_type;
 
 # MTK hotplug governor: /proc/hps/{enabled,...}. Unlabelled it is plain `proc`,
-# which private/coredomain.te:99 forbids every core domain from touching; our
-# m95_fatal_capture bring-up script writes /proc/hps/enabled, so the node needs
-# a type of its own rather than an exemption. [CONV: MTK hps procfs]
+# which private/coredomain.te:99 forbids every core domain from touching, so the
+# node has a type of its own rather than an exemption; m95-cpuset.sh writes
+# /proc/hps/enabled (m95_scripts.te). [CONV: MTK hps procfs]
 type proc_hps, fs_type, proc_type;
 
 # The VoLTE daemons' init-created rendezvous sockets (volte_daemons.te,
@@ -198,8 +200,6 @@ type volte_stack_socket, file_type;
 type volte_ua_socket, file_type;
 type volte_imcb_socket, file_type;
 
-##########################
-# 2026-09-24 (Android 13, SELinux lane).
 
 # /data/ccci_cfg -- modem config store, mkdir'd by init.m95.modem.rc:47 and
 # read by ccci_mdinit. FACT (192234): denied { getattr } path=/data/ccci_cfg
@@ -230,11 +230,6 @@ type m95_proc_swappiness, fs_type, proc_type;
 # (security/selinux/hooks.c:737, SE_SBGENFS), so one file can get a type.
 type m95_debugfs_ged_boost, fs_type, debugfs_type;
 
-##########################
-# 2026-09-25 (perf profile, rootdir/m95-perfprofile.sh). MTK procfs knobs the
-# m95_cpuset patrol writes when persist.vendor.m95.perfprofile=1. Unlabelled
-# they are plain `proc`; typed so the grant does not open all of /proc.
-# /proc/ppm -- MTK PPM (power state pin: policy/hica_power_state).
 type m95_proc_ppm, fs_type, proc_type;
 # /proc/cpufreq -- MTK cpufreq driver (cpufreq_power_mode).
 type m95_proc_cpufreq, fs_type, proc_type;

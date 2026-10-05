@@ -1,0 +1,20 @@
+
+on post-fs-data
+    mkdir /data/vendor/m95-powertrap 0770 root system
+
+service m95_powertrap /vendor/bin/sh /vendor/bin/m95-powertrap.sh 1
+    # Explicit domain, same reason as m95_cpuset: the executable is the
+    # shared vendor shell (sepolicy/vendor/powertrap.te).
+    seclabel u:r:m95_powertrap:s0
+    class late_start
+    user root
+    group root system log
+    disabled
+
+# Persistent properties are loaded after /data is mounted, so this also fires
+# on every boot while the switch is on.
+on property:persist.vendor.m95.powertrap=1
+    start m95_powertrap
+
+on property:persist.vendor.m95.powertrap=0
+    stop m95_powertrap

@@ -41,13 +41,16 @@ set_prop(vendor_init, {
 set_prop(vendor_init, m95_usb_prop)
 
 # Keys of vendor/build.prop that stay refused on purpose:
-#   ro.secure=0, ro.adb.secure=0, ro.debuggable=1, persist.sys.usb.config=adb
-#     (device.mk PRODUCT_DEFAULT_PROPERTY_OVERRIDES, "insecure ADB early").
+#   ro.secure=0, ro.adb.secure=0, ro.debuggable=1
+#     (device.mk PRODUCT_DEFAULT_PROPERTY_OVERRIDES, only when built with
+#     M95_INSECURE_ADB=true; off by default since #28).
 #     Platform-owned; system/build.prop already carries ro.secure=1,
 #     ro.adb.secure=1, ro.debuggable=1, and duplicating them there fails the
 #     build (build/make/tools/post_process_props.py:112). Consequence under
 #     enforcing: adbd is not root by default and asks for key authorisation --
-#     authorise the host key and use `adb root` (ro.debuggable=1 stays).
+#     the hosts in /adb_keys (device.mk M95_ADB_KEYS) pass, then `adb root`
+#     (ro.debuggable=1 stays).
+#   persist.sys.usb.config=adb -- in system.prop since #28, see there.
 #   ro.recovery.usb.* -- read by recovery only.
 #   ro.adb.nonblocking_ffs -- moved to system.prop, see there.
 
@@ -149,3 +152,15 @@ allow vendor_init {
 # Types in file.te / genfs_contexts.
 allow vendor_init m95_proc_swappiness:file w_file_perms;
 allow vendor_init m95_debugfs_ged_boost:file w_file_perms;
+
+# init.mt6797.rc `on early-init`: write /proc/sys/kernel/dmesg_restrict 1 (the
+# kernel log only for CAP_SYSLOG). Vendor rc commands run as vendor_init, and
+# public/domain.te:456 exempts vendor_init from the proc_security neverallow
+# exactly for writes like this; the platform grants it only to init.
+allow vendor_init proc_security:file w_file_perms;
+
+# init.mt6797.rc `on early-init`: write /sys/module/firmware_class/parameters/path
+# (kernel direct firmware loading from /vendor/firmware -- without it every suspend
+# attempt sends a firmware uevent that aborts it, m95-diag-20260929.md s.14).
+# Type in file.te / genfs_contexts.
+allow vendor_init sysfs_fw_class_path:file w_file_perms;

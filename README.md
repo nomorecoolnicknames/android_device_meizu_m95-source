@@ -14,12 +14,12 @@ Device configuration and compatibility code maintained by [ReMeizu](https://gith
 
 ## Status
 
-Native Android 13 boots on MX6. Hardware testing of build 23 on 2026-09-26 observed LTE data and IMS registration. Incoming IMS calls still crashed; the subsequent call-handling and camera changes need device testing. These build 23/24 observations predate the current published source tip, which has not been freshly rebuilt or tested on hardware.
+Native Android 13 boots on MX6. Hardware testing of build 23 on 2026-09-26 observed LTE data and IMS registration. Incoming IMS calls still crashed; the subsequent call-handling and camera changes need device testing. Those earlier hardware observations predate this source tip. Full native ROM build 31 completed on 5 October 2026; the subsequent hotplug, consumer IR permissions and thermal service source changes are not a new full hardware acceptance pass.
 
 | Stage | Result |
 | --- | --- |
 | Source | Device tree, source HALs and compatibility shims available |
-| Build | Earlier native LOS20 builds completed; build 24 was built but not hardware-tested |
+| Build | Native LOS20 build 31 completed on 5 October; later source changes await full acceptance |
 | Hardware | Boot and LTE data observed; camera lifecycle, IMS calls and sustained power/thermal behaviour remain open |
 
 ## Components
@@ -37,6 +37,7 @@ Native Android 13 boots on MX6. Hardware testing of build 23 on 2026-09-26 obser
 | Fingerprint | [fingerprint](fingerprint) | Service wrapper source; stock HAL/TEE external | Unlock reported; repeatable enrollment/unlock coverage pending |
 | Lights | [lights/lights.c](lights/lights.c) | HAL source | Backlight/LED functional coverage unverified |
 | GPS | [shims/Android.bp](shims/Android.bp) (`libm95shim_ssl`, `libm95shim_mnld`) | Adapters; GNSS daemon/firmware external | Earlier GNSS crash fixes need a verified location fix |
+| Thermal | [thermal](thermal) | Source HAL 2.0 exposing only real sensor readings; no fabricated trip thresholds | Compiled/service integration requires physical temperature and throttling validation |
 | Power / security | [BoardConfig.mk](BoardConfig.mk) · [sepolicy](sepolicy) | Kernel/HAL configuration and policy | Suspend/thermal tests open; enforcing and encryption incomplete |
 
 ## Build
@@ -69,3 +70,9 @@ The [ReMeizu overview](https://github.com/nomorecoolnicknames/remeizu/blob/main/
 ## Credits
 
 LineageOS and CyanogenMod contributors, the original device-tree authors, and ReMeizu contributors. Copyright and license notices remain with their source files.
+
+## Current integration changes
+
+Legacy camera Looper storage is allocated for the matching vendor ABI. Optional hotplug tuning is exposed through `persist.vendor.m95.hps` only with a kernel that implements the corresponding hotplug fixes. Consumer IR policy permits the source HAL to access `/dev/irtx`. The thermal HAL reads actual available sensors and does not invent thermal thresholds. These changes do not establish smooth GCam frame delivery, stable IMS calls, working Wi-Fi VHT or safe sustained thermals.
+
+Public builds use no pretrusted workstation ADB keys by default. Supply `M95_ADB_KEYS` explicitly only when required for your own test environment. Camera APKs remain separately supplied inputs; `gcam/fetch-gcam.sh` requires the caller's directory and verifies pinned hashes before unpacking.

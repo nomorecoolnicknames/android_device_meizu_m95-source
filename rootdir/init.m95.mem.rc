@@ -1,11 +1,3 @@
-# m95 memory policy for the Android 13 GSI (FACT 2026-09-12, FLYME13_KERNEL_PLAN.md §10.3):
-#  - zram declared in fstab.mt6797; the Flyme init.rc has no swapon_all, so do it here;
-#  - kernel LMK minfree raised (last two tiers 315 MB -> 400/480 MB) so cached apps are
-#    killed before the system swaps in and out background services on every
-#    interaction (~1000 major faults/s = the "jerky screen").
-#  ActivityManager (ProcessList.updateOomLevels -> sys.lmk.minfree_levels -> lmkd)
-#  rewrites the kernel param during boot, so the write has to come after
-#  sys.boot_completed as well (FACT: post-fs-data write alone was overridden).
 
 # Kernel 3.18 prints a full register dump (do_ni_syscall + Code:) for every
 # unknown syscall; A13 userspace hits them routinely (system_server:
@@ -18,21 +10,12 @@ on early-init
 
 on post-fs-data
     swapon_all /vendor/etc/fstab.mt6797
-    # zram 2 GiB (Brawl Stars alone is ~1 GB resident; 1 GiB filled up, 214% iowait,
-    # 1 fps, FACT 2026-09-13).  zram-friendly VM knobs: swap eagerly to compressed
-    # RAM rather than evicting file pages, and no read-ahead clusters.
     write /proc/sys/vm/swappiness 100
     write /proc/sys/vm/page-cluster 0
 
 on property:sys.boot_completed=1
     write /sys/module/lowmemorykiller/parameters/minfree 18432,23040,27648,32256,102400,122880
 
-# Performance floor (FACT 2026-09-12, FLYME13_KERNEL_PLAN.md §10.3): GED GPU DVFS has
-# no userspace ged_srv and sits at 238-520 MHz while scrolling (swap 7-9 ms/frame).
-# custom_boost_gpu_freq is a floor applied in every ged_dvfs_gpu_freq_commit():
-# level N -> index 6-N; 4 = 610 MHz (idle GPU still powers off).  Input boost
-# (/proc/gpufreq/gpufreq_input_boost) raises it to 780 on touch.  The interactive
-# governor defaults (go_hispeed_load 99, target 90, 20 ms timer) ramp late.
 on property:sys.boot_completed=1
     write /sys/kernel/debug/ged/hal/custom_boost_gpu_freq 4
     write /sys/devices/system/cpu/cpufreq/interactive/go_hispeed_load 85
@@ -41,11 +24,6 @@ on property:sys.boot_completed=1
     write /sys/devices/system/cpu/cpufreq/interactive/min_sample_time 40000
     write /sys/devices/system/cpu/cpufreq/interactive/hispeed_freq 1391000
 
-# CPU weight of the background and dex2oat groups (2026-09-24, meizu-fleet/designs/
-# M95_PERF_AUDIT_20260924.md P1-1).  A13 init.rc creates /dev/cpuctl/{background,dex2oat}
-# but never writes cpu.shares, and 3.18 has neither uclamp nor schedtune, so each group
-# weighed as much as top-app: a cached app syncing or dex2oat competed with the UI at
-# equal CFS weight on every core.  Stock Flyme gave background 52 (stock init.rc:152).
 on boot
     write /dev/cpuctl/background/cpu.shares 52
     write /dev/cpuctl/dex2oat/cpu.shares 128

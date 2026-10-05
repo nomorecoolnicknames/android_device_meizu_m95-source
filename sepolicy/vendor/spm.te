@@ -1,0 +1,12 @@
+
+type spm_loader, domain;
+type spm_loader_exec, exec_type, vendor_file_type, file_type;
+init_daemon_domain(spm_loader)
+
+allow spm_loader spm_device:chr_file rw_file_perms;
+
+# Logging basics, the thermal.te / mtkmal.te expansion of logd_client().
+allow spm_loader pmsg_device:chr_file w_file_perms;
+allow spm_loader logdw_socket:sock_file write;
+allow spm_loader logd:unix_dgram_socket sendto;
+allow spm_loader null_device:chr_file rw_file_perms;

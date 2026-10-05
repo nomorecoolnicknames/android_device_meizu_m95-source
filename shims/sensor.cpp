@@ -3,7 +3,7 @@
 // ASensorEventQueue and has no descriptor of its own. The first version returned
 // -1: the camera's sensor-listener thread (Mtkcam@SensorLi) handed it to its
 // Looper unchecked and the provider died with SIGSEGV at 0x10 in
-// Looper::pollInner (tombstone 2026-09-24 21:22). Return a valid descriptor that
+
 // never becomes readable instead: the Looper accepts it, the listener simply
 // receives no sensor events (gyro-assisted features stay off), nothing crashes.
 #include <log/log.h>

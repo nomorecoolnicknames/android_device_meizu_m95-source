@@ -1,31 +1,4 @@
-/* libperfservicenative.so replacement — MTK PerfService client stubs.
- *
- * FACT (system_server ANR dump, vendor25, 2026-09-06 22:57): the camera
- * provider's main thread sat in Cam1DeviceBase::onUninit() ->
- * CpuCtrlImp::disable() (libmtkcam_sysutils) on a pthread mutex with no other
- * provider thread holding it; cameraserver's ICameraDevice::close() waited on
- * that, its ProviderManager lock was held, and system_server's ui thread hung
- * in CameraManager.registerTorchCallback -> getConcurrentCameraIds until the
- * Watchdog killed it (first system_server of every boot since the camera HAL
- * started loading).
- * FACT: CpuCtrlImp dlopen()s libperfservicenative.so and dlsym()s
- * PerfServiceNative_user{RegScn,RegScnConfig,Enable,EnableTimeout,Disable,
- * Unreg,GetCapability,RegBigLittle}; the stock lib talks to the MTK
- * "perfservice" binder service, which does not exist on this port (no daemon,
- * and vendor processes would look on /dev/vndbinder anyway). The audio HAL
- * logs the same absence ("Audio_PerfServiceNative_userUnregScn == NULL").
- * INFERENCE: enable() bails out with the mutex still held when registration
- * fails, so the later disable() self-deadlocks. Giving every consumer
- * (libmtkcam_sysutils, libmtkcam_hwutils, libcamalgo, libhdrproc,
- * libvcodecdrv, libRSDriver_mtk, libClearMotionFW, libfposervice, audio) a
- * client that always succeeds locally (valid handles, no-op boosts) keeps them
- * on their normal code paths. CPU boosts are simply not applied.
- *
- * Installed as /vendor/lib{,64}/libperfservicenative.so (Soong stem:); the
- * blob copies are dropped from m95-vendor.mk. All entry points take ints in
- * the N-era perfservice_native.h; a uniform 6-int prototype is ABI-safe for
- * callers passing fewer arguments (AAPCS/AAPCS64: extra registers ignored,
- * callers that expect void ignore r0/w0). */
+
 
 #define STUB0(name) int name(int a, int b, int c, int d, int e, int f) { (void)a;(void)b;(void)c;(void)d;(void)e;(void)f; return 0; }
 #define STUB1(name) int name(int a, int b, int c, int d, int e, int f) { (void)a;(void)b;(void)c;(void)d;(void)e;(void)f; return 1; }

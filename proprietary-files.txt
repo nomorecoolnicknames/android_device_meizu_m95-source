@@ -1,90 +1,3 @@
-# Proprietary blob inventory — Meizu MX6 (m95, MT6797), LineageOS 20.
-#
-# Provenance of every file: the stock Flyme 8.0.5.0A system image
-# (Android 7.1.1 / NMF26O, from MX6-flyme-8.0.5.0-update.zip,
-# sha256 b77e4a14...), extracted with sdat2img; see
-# meizu_mx6_m95/DEVICE_FACTS.md "Blobs".  The list itself is the DT_NEEDED
-# closure computed in the 16.0 port (tools/blob-symdiff.py +
-# tools/blob-needcheck.py over 710/728 ELFs), carried forward through 18.1.
-#
-# Syntax is LineageOS extract_utils "src[:dst]":
-#   * "vendor/..."          -> stock /system/vendor/..., installed to /vendor/...
-#   * "system/x:vendor/x"   -> lived in stock /system, but belongs on OUR vendor
-#     partition (the stock ROM has no vendor partition at all: the stock scatter
-#     declares zero `vendor` entries and the blobs sit in /system/vendor).
-#   * "system/..."          -> stays on the system partition.
-#
-# !! READ BEFORE RE-EXTRACTING !!
-# The blob tree that this port actually builds from
-# (vendor/meizu/m95/proprietary) is NOT a clean extract_utils output: ~30 files
-# that came from stock /system/{bin,lib,lib64} are stored at the top level of
-# proprietary/ rather than under proprietary/vendor/, and several blobs are
-# byte-patched (sensors multi-HAL hals.conf path, librilmtk soname rename,
-# camera checkStream).  vendor/meizu/m95/m95-vendor.mk is hand-maintained to
-# match that layout and to keep the lights.mt6797 blob copy OUT of the image.
-# A plain `./extract-files.sh` will produce a self-consistent but DIFFERENT
-# layout and will lose the patches.  See M95_LOS20_TREE.md.
-#
-# Two known traps from the 16.0 extraction, still true:
-#   * sdat2img stores symlinks as TEXT files; always `file` a blob before
-#     shipping it (hit on keystore/gatekeeper .mt6797/.mz6797_6m_n and on
-#     vulkan.mt6797.so, which is why Android.mk recreates that symlink).
-#   * an earlier 860-entry inventory silently missed vendor/lib{,64}/egl/
-#     (libGLES_mali.so — no GPU without it), the Trustonic trustlets in
-#     vendor/app/mcRegistry/ and the Meizu camera / Goodix libs that live in
-#     /system/lib{,64}.
-#
-# BLOB AUDIT 2026-09-16 (fleet hygiene pass): NOTHING REMOVED — and that is a
-# measured result, not an omission.
-#
-# QUESTION ASKED: which line of this list names a file that Android 13 builds
-# from source and would therefore be silently overridden by a PRODUCT_COPY_FILES
-# rule (copy rule from build/make/core/Makefile:72 beats the module rule in
-# base_rules.mk:533 / installs-<product>.mk)?
-#
-# METHOD (reproducible): all 906 distinct destinations of this list were
-# intersected with every install destination Soong wrote for this product,
-# <original-workspace>/los20-out/out-m95/soong/installs-lineage_m95.mk (36592
-# destinations, from the m95 build of 2026-09-16); then the same was done by
-# BASENAME, to catch a blob that shadows an A13 module sitting in a different
-# directory.
-#
-# RESULT — exactly one destination is shared, in both bitnesses:
-#   vendor/lib{,64}/hw/fingerprint.default.so
-#     A13 builds hardware/libhardware/modules/fingerprint/fingerprint.default
-#     into that path (installs-lineage_m95.mk:90562,90566), and kati confirms
-#     the collision out loud: "overriding commands for target
-#     .../vendor/lib64/hw/fingerprint.default.so" in
-#     <original-workspace>/meizu-fleet/build-m95.log — the ONLY such warning in
-#     that whole log.
-#     THE BLOB STAYS.  FACT: proprietary/lib{,64}/hw/fingerprint.default.so is
-#     the Goodix vendor HAL — .name "Goodix Fingerprint HAL", DT_NEEDED
-#     libgf_hal.so / libgf_ca.so / libgoodixfingerprintd_binder.so, built with
-#     "GCC: (GNU) 4.9 20150123 (prerelease)".  AOSP's fingerprint.default is
-#     the "Demo Fingerprint HAL" (hardware/libhardware/modules/fingerprint/
-#     fingerprint.c:120) and does nothing.  So this is the one collision we
-#     want, in the same sense as power.default.so on the m5c.
-#
-# NEAR MISSES, checked and deliberately left alone:
-#   vendor/lib/libbt-vendor.so — device/meizu/m95/shims builds
-#     libm95shim_btvendor into vendor/lib64/libbt-vendor.so, 64-bit ONLY; this
-#     blob line is the 32-bit file.  They do not collide today.  HYPOTHESIS: if
-#     the shim ever grows a 32-bit variant the winner becomes makefile order —
-#     drop this line at that moment.
-#   vendor/lib{,64}/liblogwrap.so — A13 builds system/logging/logwrapper into
-#     system/lib{,64}/liblogwrap.so and into the ramdisk, never into /vendor.
-#     The /vendor copy is the same class of deliberate second copy as
-#     libbinder.so / libnetutils.so (M95_LOS20_TREE.md §"второй libbinder"),
-#     which that report declares mandatory.  Not touched.
-#   vendor/etc/security/cacerts_supl/594f1775.0 — A13 ships a file of the same
-#     name under system/etc/security/cacerts_google/.  Different directory,
-#     different consumer (SUPL); no collision.
-#
-# WHAT WAS *NOT* CHECKED HERE (honest gap): this intersection sees Soong
-# modules and the kati warnings of a real build.  A module declared only in an
-# Android.mk of an unrelated tree and not reached by this product's kati pass
-# would not show up.  For this workspace that gap is covered by the fact that
-# the m95 build log contains exactly one overriding-commands warning.
 
 system/bin/goodixfingerprintd:vendor/bin/goodixfingerprintd
 system/lib/hw/fingerprint.default.so:vendor/lib/hw/fingerprint.default.so
@@ -157,18 +70,18 @@ vendor/app/mcRegistry/4b2fd709b15243b99d808bd78fe9a286.tabin
 vendor/bin/MPED
 vendor/bin/MtkCodecService
 vendor/bin/aal
-vendor/bin/aee
-vendor/bin/aee_archive
-vendor/bin/aee_core_forwarder
-vendor/bin/aee_dumpstate
+#vendor/bin/aee
+#vendor/bin/aee_archive
+#vendor/bin/aee_core_forwarder
+#vendor/bin/aee_dumpstate
 vendor/bin/akmd09911
 vendor/bin/akmd09912
 vendor/bin/akmd8963
 vendor/bin/akmd8975
 vendor/bin/ami304d
-vendor/bin/atci_service
-vendor/bin/atcid
-vendor/bin/audiocmdservice_atci
+#vendor/bin/atci_service
+#vendor/bin/atcid
+#vendor/bin/audiocmdservice_atci
 vendor/bin/autobt
 vendor/bin/autokd
 vendor/bin/batterywarning
@@ -180,7 +93,7 @@ vendor/bin/charon
 vendor/bin/dhcp6c
 vendor/bin/dhcp6ctl
 vendor/bin/dhcp6s
-vendor/bin/dmlog
+#vendor/bin/dmlog
 vendor/bin/downloader
 vendor/bin/emdlogger1
 vendor/bin/emdlogger2
@@ -207,8 +120,8 @@ vendor/bin/mbimd
 vendor/bin/mc6420d
 vendor/bin/mcDriverDaemon
 vendor/bin/md_ctrl
-vendor/bin/md_monitor
-vendor/bin/md_monitor_ctrl
+#vendor/bin/md_monitor
+#vendor/bin/md_monitor_ctrl
 vendor/bin/mdlogger
 vendor/bin/memorydumper
 vendor/bin/memsicd
@@ -216,7 +129,7 @@ vendor/bin/memsicd3416x
 vendor/bin/meta_tst
 vendor/bin/mfv_ut
 vendor/bin/mnld
-vendor/bin/mobile_log_d
+#vendor/bin/mobile_log_d
 vendor/bin/msensord
 vendor/bin/mtk_agpsd
 vendor/bin/mtkmal
@@ -992,61 +905,3 @@ vendor/res/sound/CA2CA.ogg
 vendor/res/sound/CADetected.ogg
 vendor/res/sound/ringtone.wav
 vendor/res/sound/testpattern1.wav
-
-# ---------------------------------------------------------------------------
-# Files that ARE in vendor/meizu/m95/proprietary/ but are deliberately NOT in
-# the list above (verified 2026-09-16 by diffing the blob tree against this
-# file; 920 files on disk, 902 listed, 18 exceptions, no unexplained ones):
-#
-#   vendor/lib{,64}/hw/lights.mt6797.so
-#       The blob cannot work on this device (red/green/blue/button-backlight
-#       sysfs nodes are absent) — lights.mt6797 is built from source in
-#       device/meizu/m95/lights/.  A copy rule here would OVERWRITE the built
-#       module in the image, because copy rules are emitted after module rules.
-#   vendor/lib{,64}/hw/audio.r_submix.mt6797.so, audio.usb.mt6797.so
-#       Replaced by the AOSP audio.r_submix.default / audio.usb.default modules.
-#   vendor/lib{,64}/libperfservicenative.so
-#       Replaced by the device shim libm95shim_perfservice (stem
-#       libperfservicenative), device/meizu/m95/shims/perfservice.c.
-#   vendor/lib{,64}/libbinder.so, libnetutils.so
-#       Not stock blobs: these are VNDK v30 libraries taken from this port's own
-#       Android 11 build.  They are copied by device.mk, not from here, with the
-#       sphal-namespace reasoning written next to the copy rule.
-#   vendor/lib{,64}/libnativehelper.so
-#       Same kind of thing (our own R build), copied by m95-vendor-extra.mk into
-#       /vendor/lib{,64}/hw so the SYSTEM default namespace cannot see it.
-#   vendor/lib64/librilimp.so
-#       The stock MTK libril with its DT_SONAME rewritten; shipped as the
-#       `librilimp` prebuilt module in vendor/meizu/m95/Android.mk.  Then BOXED
-#       by tools/librilimp-box-nparcel.py: its 19 android::Parcel imports are
-#       renamed to android::Pbrcel in .dynstr and libm95shim_nparcel.so is added
-#       to DT_NEEDED, so the Nougat 104-byte Parcel it keeps by value no longer
-#       overruns the 120-byte A13 Parcel (rild SIGSEGV, capture
-#       m95-b16-rild-crash-20260924).  sha256 pristine d3d8309e...550a47 ->
-#       boxed 317fe586...5c9c1; librilimp.so.orig keeps the pristine blob.
-#   vendor/lib64/librilmtk.so
-#       The unmodified source of the above; kept for provenance, not installed.
-#   vendor/lib64/librilimp.so.orig
-#       Pre-box original of librilimp.so, kept so the box can be verified or
-#       reverted.  Never installed.
-#   vendor/lib/libmal_rilproxy.so
-#       32-bit MAL rilproxy plugin (mtkmal dlopens it by ENTITY_RILPROXY).  Also
-#       BOXED by tools/box-nparcel.py for the same Nougat-Parcel reason: its
-#       104-byte stack Parcel overran the frame cookie and mtkmal died with
-#       "stack corruption detected (-fstack-protector)" on the VoLTE path
-#       (capture m95-b18-volte-20260925).  9 android::Parcel imports -> Pbrcel.
-#       sha256 32f50d9b...2e81fe8 -> fc92ea79...2aece90; .orig keeps the
-#       pristine blob.  It is the only libmal_*.so MAL plugin importing Parcel.
-#   vendor/lib/libmal_rilproxy.so.orig
-#       Pre-box original of the above.  Never installed.
-#   vendor/lib/egl/libGLES_mali.so.orig, vendor/lib/libcam3_app.so.orig
-#       Pre-patch originals of byte-patched blobs, kept so the patch can be
-#       verified or reverted.  Never installed.
-#   vendor/etc/spn-conf.xml  (added 2026-09-24, after the count above)
-#       Stock /system/etc/spn-conf.xml, byte for byte (md5
-#       0abd67a9a39c6d7df5560c5eff591efd): MediaTek's PLMN -> network name
-#       table, 1109 codes.  Stock's framework read it from /system; here our
-#       libril reads it from /vendor to name the operator (hardware/ril branch
-#       meizu-legacy-vendor, "give OPERATOR real names").  Copied by
-#       m95-vendor-extra.mk.
-# ---------------------------------------------------------------------------

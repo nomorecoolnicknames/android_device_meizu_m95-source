@@ -49,7 +49,7 @@ char16_t* strdup8to16(const char* s, size_t* out_len) {
 // android_memset16/android_memset32 -- removed from R libcutils (N had them in
 // libcutils/arch-arm64/android_memset.S). gralloc.mt6797.so imports both and
 // the whole graphics stack (allocator, composer via the FB adapter, SF) dies
-// with "cannot locate symbol android_memset16" without them (logcat, 2026-09-06).
+
 // Semantics per the old header: count is in BYTES, must be a multiple of the
 // element size, dst aligned to the element size.
 extern "C" void android_memset16(uint16_t* dst, uint16_t value, size_t count) {
@@ -68,7 +68,7 @@ extern "C" void android_memset32(uint32_t* dst, uint32_t value, size_t count) {
 // apex vendor variant that the sphal namespace resolves libbinder.so to has
 // no PermissionCache at all, so every system process that loads the GPU
 // driver died with "cannot locate symbol ... referenced by libpqservice.so"
-// (zygote/SF, 2026-09-06). Bring-up answer: grant. Mangled name matches the
+
 // N-era ABI (static, const String16&), no libbinder dependency here.
 namespace android {
 class String16;
@@ -80,7 +80,7 @@ class PermissionCache {
 bool PermissionCache::checkCallingPermission(const String16&) {
     return true;
 }
-// goodixfingerprintd / libgoodixfingerprintd_binder.so (strict VNDK, 2026-09-09):
+
 // same story as libpqservice above -- under lite the system libbinder provided
 // PermissionCache, the VNDK variant has none.
 bool PermissionCache::checkPermission(const String16&, int32_t, uint32_t) {

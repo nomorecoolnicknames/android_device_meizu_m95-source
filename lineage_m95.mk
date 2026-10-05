@@ -1,13 +1,5 @@
-#
 # Copyright (C) 2026 The LineageOS Project
-#
 # SPDX-License-Identifier: Apache-2.0
-#
-# lineage_m95 — LineageOS 20 (Android 13, SDK 33) for Meizu MX6 (m95, MT6797).
-# Full Treble, real /vendor partition on `custom` (mmcblk0p3), vendor built
-# against VNDK 30.  Ported from the 18.1 tree that booted this device
-# (meizu_mx6_m95/device-18.1/meizu/m95); see meizu-fleet/trees/M95_LOS20_TREE.md.
-#
 
 # Inherit 64-bit configs (zygote64_32: the Mali/camera/RIL blob closure has
 # 32-bit-only libraries, so the 32-bit zygote is load-bearing here).
@@ -20,18 +12,6 @@ $(call inherit-product, vendor/lineage/config/common_full_phone.mk)
 # Inherit from m95 device
 $(call inherit-product, device/meizu/m95/device.mk)
 
-# VoLTE Java half: ForgeImsService (package com.mediatek.ims), the MediaTek
-# alps-P ImsService port that registered IMS on 16.0 and 18.1, ported to API 33
-# (repo meizu-fleet/wt/forge_ims, branch lineage-20).  forge-ims.mk only does
-# PRODUCT_PACKAGES += ForgeImsService.  ImsResolver finds the package through
-# config_ims_mmtel_package (overlay/packages/services/Telephony) and only
-# exists because android.hardware.telephony.ims.xml is copied in device.mk.
-#
-# vendor/forge/ims must be a REAL directory.  soong's finder skips symlinked
-# directories (build/soong/finder/finder.go:1418), so behind a symlink its
-# Android.mk is never read, and with BUILD_BROKEN_MISSING_REQUIRED_MODULES :=
-# true (BoardConfig.mk) PRODUCT_PACKAGES drops ForgeImsService without a
-# word: the image would boot with no ImsService and nothing in the build log.
 ifeq ($(wildcard vendor/forge/ims/forge-ims.mk),)
   $(error m95: vendor/forge/ims is missing; clone meizu-fleet/wt/forge_ims (branch lineage-20) there)
 endif

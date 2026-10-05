@@ -9,7 +9,7 @@
 // captures/a11-20260909/vndk-full/overlink-true.txt (__aeabi_* compiler-rt
 // false positives excluded).
 //
-// 2026-09-09, stage 1 of VNDK_FULL_MIGRATION_PLAN.md:
+
 //   libcamera_client  -> 5 consumers (camera.mt6797.so and 4 more)
 //   libmedia          -> 18 (32-bit) / 15 (64-bit) consumers
 //   libmediautils     -> audio.primary.mt6797.so only

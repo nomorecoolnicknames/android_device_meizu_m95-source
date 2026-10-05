@@ -272,7 +272,7 @@ int _ZNK7android5Fence3dupEv(void* self) { return dup(*fdOf(self)); }
 // ---- String8::setPathName(const char*) -- gone from A13 libutils ----------
 // libui_ext.so (NEEDs this library first) and libcam.client.so import it, on
 // both ABIs; the VNDK v33 libutils exports String8::setTo but no setPathName
-// (nm, 2026-09-24), so hwcomposer.mt6797.so -> libui_ext.so could not load.
+
 // N body (system/core/libutils/String8.cpp): copy the name, drop ONE trailing
 // '/'. setTo(const char*, size_t) is still exported; manual declaration as
 // for the libui targets above.

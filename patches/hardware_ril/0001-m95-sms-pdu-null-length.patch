@@ -1,0 +1,64 @@
+diff --git a/libril/ril_service.cpp b/libril/ril_service.cpp
+index 8cdf44a..5eae2ad 100755
+--- a/libril/ril_service.cpp
++++ b/libril/ril_service.cpp
+@@ -7659,19 +7659,36 @@ uint8_t hexCharToInt(uint8_t c) {
+     return INVALID_HEX_CHAR;
+ }
+ 
+-uint8_t * convertHexStringToBytes(void *response, size_t responseLen) {
+-    if (responseLen % 2 != 0) {
++uint8_t * convertHexStringToBytes(void *response, size_t *responseLen) {
++    // The MTK N blob (mtk-ril.so) hands +CMT/+CDS PDUs over straight from the
++    // AT line buffer, with NUL/CR/LF from the line split inside the reported
++    // length (log: "invalid hex char 0 10" = NUL, LF; the SMS was dropped and
++    // never acked).  Skip leading NUL/whitespace, parse up to the next NUL,
++    // drop trailing whitespace; *responseLen gets the hex length used.
++    uint8_t *hexString = (uint8_t *)response;
++    size_t len = *responseLen;
++    while (len > 0 && (hexString[0] == '\0' || isspace(hexString[0]))) {
++        hexString++;
++        len--;
++    }
++    len = strnlen((const char *)hexString, len);
++    while (len > 0 && isspace(hexString[len - 1])) len--;
++    if (len != *responseLen) {
++        RLOGW("convertHexStringToBytes: trimmed hex length %zu -> %zu", *responseLen, len);
++    }
++    *responseLen = len;
++    if (len == 0 || len % 2 != 0) {
++        RLOGE("convertHexStringToBytes: bad hex length %zu", len);
+         return NULL;
+     }
+ 
+-    uint8_t *bytes = (uint8_t *)calloc(responseLen/2, sizeof(uint8_t));
++    uint8_t *bytes = (uint8_t *)calloc(len/2, sizeof(uint8_t));
+     if (bytes == NULL) {
+         RLOGE("convertHexStringToBytes: cannot allocate memory for bytes string");
+         return NULL;
+     }
+-    uint8_t *hexString = (uint8_t *)response;
+ 
+-    for (size_t i = 0; i < responseLen; i += 2) {
++    for (size_t i = 0; i < len; i += 2) {
+         uint8_t hexChar1 = hexCharToInt(hexString[i]);
+         uint8_t hexChar2 = hexCharToInt(hexString[i + 1]);
+ 
+@@ -7695,7 +7712,7 @@ int radio::newSmsInd(int slotId, int indicationType,
+             return 0;
+         }
+ 
+-        uint8_t *bytes = convertHexStringToBytes(response, responseLen);
++        uint8_t *bytes = convertHexStringToBytes(response, &responseLen);
+         if (bytes == NULL) {
+             RLOGE("newSmsInd: convertHexStringToBytes failed");
+             return 0;
+@@ -7726,7 +7743,7 @@ int radio::newSmsStatusReportInd(int slotId,
+             return 0;
+         }
+ 
+-        uint8_t *bytes = convertHexStringToBytes(response, responseLen);
++        uint8_t *bytes = convertHexStringToBytes(response, &responseLen);
+         if (bytes == NULL) {
+             RLOGE("newSmsStatusReportInd: convertHexStringToBytes failed");
+             return 0;

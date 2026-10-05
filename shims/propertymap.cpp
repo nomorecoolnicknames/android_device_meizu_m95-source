@@ -3,7 +3,7 @@
 // String8/bool/int/float). Android 13 moved the class to libinput, which a
 // vendor process does not load, so the camera provider failed to load
 // camera.mt6797.so: 'cannot locate symbol "_ZN7android11PropertyMapD1Ev"'
-// (2026-09-24). Logic follows N system/core/libutils/PropertyMap.cpp.
+
 //
 // Layout: the blob allocates PropertyMap itself, so the only member must stay
 // what N had, a KeyedVector<String8, String8> (vptr + VectorImpl fields); the

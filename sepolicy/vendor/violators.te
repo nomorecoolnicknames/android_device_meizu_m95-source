@@ -1,15 +1,3 @@
-# R-split bring-up exemptions for m95 vendor domains.
-#
-# These are AOSP's sanctioned escape hatches (system/sepolicy/public/domain.te,
-# TODO b/34980020 and b/70393317), the same mechanism TREBLE_VENDOR_PARTITION_PLAN.md
-# §4.1a prescribes and nx549j-class ports use. They silence the *build-time*
-# neverallows for N-era MTK daemons that own files outside /data/vendor/*.
-# Runtime is permissive during bring-up, so nothing here changes behavior yet;
-# each entry is re-justified from live denials before enforcing.
-#
-# data_between_core_and_vendor_violators: vendor domains touching
-# core_data_file_type (nvdata/mnld/mcd/sensor/thermal/epdg state compiled
-# into the blobs as fixed /data paths — cannot move to /data/vendor).
 typeattribute mnld data_between_core_and_vendor_violators;
 typeattribute mtk_agpsd data_between_core_and_vendor_violators;
 typeattribute mcd data_between_core_and_vendor_violators;
@@ -36,12 +24,6 @@ typeattribute nvram_daemon vendor_executes_system_violators;
 typeattribute fuelgauged vendor_executes_system_violators;
 typeattribute batterywarning vendor_executes_system_violators;
 
-##############################################################################
-# Round 2 (2026-09-09, enforcing lane). The domains below are the ones whose
-# rules the first R-split pass commented out with "R-SPLIT-DROP". Each is a
-# HAL or daemon that keeps state under a fixed /data path compiled into the
-# blob, i.e. exactly the case the AOSP attribute exists for.
-##############################################################################
 
 # HAL domains holding core_data_file_type paths:
 #   hal_audio_default      /data/nvram (audio calibration)
@@ -90,8 +72,4 @@ typeattribute mcd socket_between_core_and_vendor_violators;
 # device/nubia/msm8953-common/sepolicy/vendor/vendor_init.te:1.
 typeattribute vendor_init data_between_core_and_vendor_violators;
 
-# 2026-09-24 (A13): goodixfingerprintd moved from the core fingerprintd domain
-# to the vendor domain goodixfpd (fingerprintd.te). Its template store
-# /data/gf_data (gf_data_file) and the Trustonic registry it reads
-# (mcd_data_file) are fixed paths in libgf_hal / libMcClient.
 typeattribute goodixfpd data_between_core_and_vendor_violators;

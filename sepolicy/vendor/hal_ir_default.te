@@ -1,0 +1,5 @@
+# Consumer IR HAL -- consumerir.mt6797.so (libconsumerir_core.so) opens
+# /dev/irtx (strings on the blob; stock ramdisk labels it irtx_device).
+# The node only exists with CONFIG_MTK_IRTX_SUPPORT=y (kernel candidate
+# 3243163a, branch mx6-irtx); without it this rule is inert.
+allow hal_ir_default irtx_device:chr_file rw_file_perms;

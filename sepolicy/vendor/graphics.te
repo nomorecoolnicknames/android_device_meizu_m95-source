@@ -45,15 +45,6 @@ allow surfaceflinger proc_ged:file r_file_perms;
 allow bootanim proc_ged:file r_file_perms;
 allow system_server proc_ged:file r_file_perms;
 
-# The composer sets debug.hwc.* / debug.sf.* tuneables (FACT: denial pair
-# property_socket write + init connectto at 01:24:12; the only property
-# prefixes in strings of hwcomposer.mt6797.so are debug.hwc.* and
-# debug.sf.sw_vsync_fps, both u:object_r:debug_prop:s0 in the Pie base
-# property_contexts). set_prop expands to both halves of the denial.
-# 2026-09-24 (A13): a vendor domain may read debug_prop but not set it
-# (compatible_property_only "Prevent properties from being set"). debug.hwc.*
-# is relabelled m95_hwc_debug_prop (property_contexts) and granted in
-# mtk_props.te; debug.sf.* is only read here.
 
 # MTK GuiExt: the composer registers GuiExtService on vndbinder (FACT:
 # { add } on what fell through to default_android_vndservice, 2026-08-14;
@@ -62,65 +53,10 @@ allow system_server proc_ged:file r_file_perms;
 # hwservicemanager); find stays, add returns with the decode phase.
 allow hal_graphics_composer_default guiext_service:service_manager find;
 
-# Round 23 -- composer HAL on the framework binder domain.
-#
-# FACT (thread dump, 2026-08-16): the GuiExt pool inside the conventional
-# composer HAL calls SurfaceComposerClient::getBuiltInDisplay(), which goes
-# through ComposerService::connectLocked() -- an unbounded retry loop around
-# getService("SurfaceFlinger"). On /dev/vndbinder that name does not exist
-# (`vndservice list` returns GuiExtService and nothing else, while
-# `service list` has SurfaceFlinger at 127), so the loop never ends and the
-# video decoder deadlocks behind the binder call it made into this HAL.
-#
-# With ro.vendor.binder.framework_domain=1 this service uses /dev/binder, so
-# it needs the framework binder plumbing and the ability to find
-# SurfaceFlinger.
-#
-# CORRECTION 2026-09-09 (enforcing lane). The old note here said this was legal
-# only because PRODUCT_FULL_TREBLE_OVERRIDE is false and the full_treble_only
-# neverallows are compiled out. Both halves are wrong on 18.1:
-# BoardConfig.mk:113 sets it to true, and the neverallows are present in the
-# compiled policy (counted in plat_sepolicy.cil). The three rules below are
-# nonetheless legal, and for a better reason -- they are a VENDOR domain
-# (hal_graphics_composer_default) using the framework binder and finding a
-# framework service, which no neverallow forbids; what the treble rules forbid
-# is the mirror image, a CORE domain on vndbinder (see surfaceflinger.te).
-# Verified the only way that counts: m selinux_policy passes with them in.
 binder_use(hal_graphics_composer_default)
 binder_call(hal_graphics_composer_default, surfaceflinger)
 allow hal_graphics_composer_default surfaceflinger_service:service_manager find;
 
-##############################################################################
-# 2026-09-24 (Android 13, SELinux lane): GED and CMDQ ioctl commands.
-#
-# The "no allowxperm" note above no longer holds, for two reasons.
-#
-# 1. Android 13 already puts xperm rules on these pairs.
-#    system/sepolicy/public/domain.te:317/327/338 allowxperm every domain on
-#    { file_type fs_type }:file for FIOCLEX/FIONCLEX, TCGETS and the F2FS
-#    set. proc_ged and proc_cmdq are fs_type, so every pair below has an
-#    xperm entry and only listed commands pass, whatever the base ioctl
-#    grant says. FACT (capture m95-boot-20260924-192234): denied { ioctl }
-#    on /proc/ged with ioctlcmd 6700/6701/6704/6764-6768 from composer (x11791
-#    in dmesg alone), bootanim, surfaceflinger, allocator and platform_app,
-#    and on /proc/mtk_cmdq 780b from composer and mediacodec -- all of them
-#    domains that DO hold `ioctl` here. Under enforcing every GED query fails.
-#    The same storm drove audit_lost to 43194 at audit_rate_limit=5, so that
-#    census is incomplete for everything logged after ~51 s.
-#
-# 2. The kernel defect is fixed. The v30-selector fix is commit d09da23b in
-#    kernel/m685, an ancestor of 78e751a9, the build (#145) the device runs
-#    (Linux version line of both captures). Consistent with that, neither
-#    capture carries a single netd/wpa_supplicant socket-ioctl denial (18.1
-#    census: x478/x330 per window).
-#
-# Command sets are the complete ones from the kernel headers, not just the
-# observed ones: GED_BRIDGE_COMMAND_* in drivers/misc/mediatek/gpu/ged/
-# include/ged_bridge.h (0x00-0x09 and GE_* 100-104, magic 'g') and
-# CMDQ_IOCTL_* in drivers/misc/mediatek/cmdq/v2/cmdq_driver.h (1-12, magic
-# 'x'). They are deliberately short of a whole driver byte, so the policy
-# compiler emits function-level entries -- the xperm form this kernel is
-# known to evaluate correctly (the platform's own rules are all of it).
 allowxperm {
   hal_graphics_composer_default
   hal_graphics_allocator_default
@@ -142,8 +78,4 @@ allowxperm {
   mediacodec
 } proc_cmdq:file ioctl { 0x7801-0x780c };
 
-# 2026-09-24 (A13): GuiExtService registration on vndservicemanager. FACT
-# (192234): { add find } name=GuiExtService by the composer on
-# default_android_vndservice. mediacodec deliberately gets NO find on it --
-# m95_enforcing.te round 23 (finding it deadlocks hardware video decode).
 add_service(hal_graphics_composer_default, guiext_vndservice)

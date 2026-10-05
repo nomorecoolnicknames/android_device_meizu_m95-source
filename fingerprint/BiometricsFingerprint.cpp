@@ -180,19 +180,7 @@ Return<RequestStatus> BiometricsFingerprint::cancel() {
     return ErrorFilter(mDevice->cancel(mDevice));
 }
 
-/*
- * Template ledger.  The goodix blob has no enumerate (slot 208 is NULL, see the
- * history in the comment below), and Android 13's BiometricScheduler serialises
- * everything behind FingerprintInternalCleanupClient, which waits for
- * onEnumerate(remaining=0) that never came: the sensor looked "detected" but
- * every enroll/auth queued forever (FACT 2026-09-12, Flyme 13 GSI: dumpsys
- * fingerprint "Current operation: FingerprintInternalCleanupClient" for good).
- * Answering "no templates" would make the framework delete its enrolments on
- * every HAL restart, so the HAL keeps its own list: ids are recorded on the
- * final onEnrollResult and dropped on onRemoved, in the store path the
- * framework hands to setActiveGroup (/data/vendor_de/<user>/fpdata,
- * fingerprint_vendor_data_file, writable by hal_fingerprint).
- */
+
 static const char* kLedgerName = "/m95_templates.txt";
 
 std::vector<uint32_t> BiometricsFingerprint::ledgerLoad() {

@@ -1,27 +1,3 @@
-# Goodix fingerprint daemon -- /vendor/bin/goodixfingerprintd.
-#
-# 2026-09-24 (Android 13, SELinux lane): the daemon has a VENDOR domain of its
-# own, goodixfpd, instead of the platform `fingerprintd` it was pinned into by
-# `seclabel` since LOS16. fingerprintd is a coredomain (private/
-# fingerprintd.te), fingerprintd_exec is system_file_type, and a coredomain
-# may not execute /vendor files (public/domain.te, full_treble_only), so no
-# rule could make that pairing legal -- the blocker SELINUX_ENFORCING_PLAN.md
-# §4.2 recorded on 18.1. FACT (both captures), scontext=fingerprintd:
-#   { entrypoint } path=/vendor/bin/goodixfingerprintd tcontext=vendor_file
-#   { execute open read } libgf_hal.so (vendor_file), libm95shim_utils.so
-#   (same_process_hal_file), libbinder.so (113630, before 8d35fea)
-#   { open read write ioctl } /dev/vndbinder, { call transfer } vndservicemanager
-#   { add } android.hardware.fingerprint.IGoodixFingerprintDaemon on
-#   default_android_vndservice
-# and, from the HAL side, hal_fingerprint_default { find } on the same name,
-# vndbinder and a vndservicemanager call. On A13 the daemon links the VNDK
-# libbinder, so its ProcessState is /dev/vndbinder and the service lives in
-# vndservicemanager -- the Treble-correct vendor-to-vendor shape.
-# Under enforcing before this change the daemon did not start at all.
-#
-# goodixfpd.rc drops its seclabel line; the exec label does the transition.
-# No keystore: the binary carries no keystore strings, auth tokens travel
-# HAL -> framework.
 
 type goodixfpd, domain;
 type goodixfpd_exec, exec_type, vendor_file_type, file_type;

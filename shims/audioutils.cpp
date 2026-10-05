@@ -31,7 +31,7 @@ void release_echo_reference(struct echo_reference_itfe* /*reference*/) {
 }  // extern "C"
 
 // ---- android::AudioSystem::getDeviceConnectionState(audio_devices_t, const char*)
-// The only AudioSystem import of audio.primary.mt6797.so (readelf 2026-09-06).
+
 // The blob calls it inside adev_open() (headset/BT presence check). On R the
 // HAL lives in android.hardware.audio.service: R libaudioclient resolves the
 // call through the vendor libbinder -> /dev/vndbinder, where media.audio_policy

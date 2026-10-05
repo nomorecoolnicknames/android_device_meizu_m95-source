@@ -13,14 +13,7 @@
      ships its own VINTF fragment (wifi@1.0-service, gatekeeper@1.0-
      service.software, fingerprint@2.0-service.m95) are deliberately absent:
      the build merges those fragments into this manifest. -->
-<!-- 2026-09-17: target-level 1 -> 3 (FACT).
-     Android 13 несёт только матрицы FCM 3..7 (hardware/interfaces/compatibility_matrices/);
-     уровень 1 (Android 8.0) больше не существует, и ota_from_target_files падал:
-       checkvintf: Cannot find framework matrix at FCM version 1 (exit 70).
-     Проверено на копии манифеста тем же checkvintf с теми же dirmap, что в сборке:
-       target-level=3 -> rc=0 (совместим), 4 -> rc=65, 5 -> rc=65.
-     3 = матрица Android 9 — соответствует вендору, портированному с Pie/A11.
-     Это НЕ пропуск проверки: совместимость с матрицей 3 реально проходит. -->
+
 <manifest version="1.0" type="device" target-level="3">
     <!-- Both 2.0 and 6.0 are declared, and both impls are installed: the
          combined android.hardware.audio.service registers the FIRST version
@@ -84,9 +77,7 @@
             <instance>default</instance>
         </interface>
     </hal>
-    <!-- android.hardware.boot@1.0 REMOVED 2026-09-06: m95 is not A/B, there is
-         no bootctrl.mt6797 module, the service exited silently every 5 s
-         (vendor19 boot log); boot@1.0 is optional="true" in FCM level 1. -->
+
     <hal format="hidl">
         <name>android.hardware.camera.provider</name>
         <transport>hwbinder</transport>
@@ -118,11 +109,7 @@
             <instance>default</instance>
         </interface>
     </hal>
-    <!-- android.hardware.gatekeeper 1.0 is declared by the manifest fragment of
-         android.hardware.gatekeeper@1.0-service.software (AOSP software
-         gatekeeper, device.mk). Declaring it here as well makes the whole vendor
-         manifest unparseable ("Cannot add manifest fragment") and then NO HAL
-         can register (2026-09-06, vendor18). -->
+
     <hal format="hidl">
         <name>android.hardware.gnss</name>
         <transport>hwbinder</transport>
@@ -226,29 +213,7 @@
             <instance>default</instance>
         </interface>
     </hal>
-    <!-- RIL. Not decorative: soong sets Enforce_vintf_manifest (soong.variables
-         "Enforce_vintf_manifest": true) because PRODUCT_FULL_TREBLE_OVERRIDE is
-         true in BoardConfig.mk:113 - NOT because of the shipping API level,
-         which on this build is 25, not 30 (corrected 2026-09-09). So
-         libhidlbase is built with
-         ENFORCE_VINTF_MANIFEST and getService() refuses to look up any HAL
-         missing from the manifest (ServiceManagement.cpp: allowLegacy =
-         !kEnforceVintfManifest, and the EMPTY transport then skips the whole
-         retry loop). FACT 2026-09-07, vendor30: rild ran, registered
-         IRadio/slot1+slot2, and the framework still logged
-         "getRadioProxy: mRadioProxy for slot1 is disabled [PHONE0]" +
-         CommandException: RADIO_NOT_AVAILABLE forever, because RIL.java caches
-         the failed lookup in mDisabledRadioServices and never retries. On
-         LOS16 (shipping API 28) the enforcement was off, which is why the
-         16.0 tree has no radio entry here.
-         Versions: our libril registers IRadio/ISap at @1.1 (ril_service.cpp /
-         sap_service.cpp registerService). slot2 is declared because
-         SIM_COUNT=2 makes registerService loop over both.
-         lineage-20: no IOemHook entry any more. The lineage-20 libril dropped
-         the OemHook service (hardware/ril ff9403f: no IOemHook in
-         ril_service.cpp, no radio.deprecated@1.0 in libril/Android.mk), the
-         MTK port on meizu-legacy-vendor keeps it dropped, and Android 13's
-         telephony framework has no IOemHook client. -->
+
     <hal format="hidl">
         <name>android.hardware.radio</name>
         <transport>hwbinder</transport>
@@ -291,8 +256,5 @@
             <instance>default</instance>
         </interface>
     </hal>
-    <!--
-  Avoid duplicate Wi-Fi HAL declarations supplied by installed VINTF fragments.
--->
 
 </manifest>

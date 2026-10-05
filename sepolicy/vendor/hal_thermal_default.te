@@ -1,0 +1,10 @@
+# Thermal HAL 2.0 (thermal/, android.hardware.thermal@2.0-service.m95).
+# Reads zone type/temp under /sys/class/thermal -> /sys/devices/virtual/thermal,
+# which this kernel leaves as generic sysfs (thermal.te). sysfs_thermal is
+# listed as well so the rule keeps working if the tree is ever labelled.
+# getCpuUsages reads /proc/stat.
+r_dir_file(hal_thermal_default, sysfs_thermal)
+allow hal_thermal_default sysfs:dir r_dir_perms;
+allow hal_thermal_default sysfs:file r_file_perms;
+allow hal_thermal_default sysfs:lnk_file read;
+allow hal_thermal_default proc_stat:file r_file_perms;

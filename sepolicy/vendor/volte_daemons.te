@@ -1,35 +1,3 @@
-# VoLTE AP-stack daemons — /vendor/bin/volte_ua (the SIP user agent),
-# /vendor/bin/volte_stack (SIP transactions/timers), /vendor/bin/volte_imcb
-# (IMS control block). Skeleton domains on the mtkmal.te starting-set method.
-#
-# WHY NOW: the 2026-08-18 census #2 proved mtkmal itself drives these three
-# via ctl.start$/ctl.stop$ (FACT: denied { set } property=
-# ctl.stop$volte_{stack,ua,imcb} from u:r:mtkmal:s0). Until this change the
-# services did not exist in any rc of our build, so the control messages hit
-# nothing. Definitions are ported from the stock m95 boot ramdisk
-# init.volte.rc into rootdir/init.m95.volte.rc.
-#
-# DELIBERATELY MINIMAL: logging, /dev/null, own sockets — the mtkmal.te
-# starting set. All three services are oneshot+disabled, they run only when
-# mtkmal starts them, so an incomplete domain cannot hurt boot; their first
-# real run produces the census that finishes each domain. Vendor lib loading
-# needs no rule here -- but NOT for the reason this comment used to give.
-#
-# CORRECTION 2026-09-09 (enforcing lane). The old text credited "the
-# not_full_treble branch of public/domain.te". That branch is NOT compiled on
-# 18.1: BoardConfig.mk:113 sets PRODUCT_FULL_TREBLE_OVERRIDE := true, and
-# system/build.prop:74 of the built image says ro.treble.enabled=true. Had that
-# been the only thing holding these three up, they would fail to load a single
-# vendor library under enforcing and VoLTE would die at the first
-# `start volte_imcb`.
-#
-# Checked before assuming: the grant exists on the OTHER side of the same
-# guard. public/domain.te:190-204 is a full_treble_only() block, and inside it
-#   allow { domain -coredomain } vendor_file_type:dir  r_dir_perms;
-#   allow { domain -coredomain } vendor_file_type:file { read open getattr execute map };
-# covers every vendor domain, these three included (none is coredomain), and
-# covers dir *read* as well -- so even the mtkmal opendir() caveat is moot on
-# this branch. Conclusion unchanged, reasoning replaced.
 
 type volte_ua, domain;
 type volte_ua_exec, exec_type, vendor_file_type, file_type;

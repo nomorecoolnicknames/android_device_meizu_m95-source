@@ -14,40 +14,7 @@
  * limitations under the License.
  */
 
-/*
- * lights.mt6797 for Meizu m95 (MX6), built from source.
- *
- * Replaces the stock Flyme lights.mt6797.so blob, which hardcodes
- * /sys/class/leds/{red,green,blue,button-backlight,keyboard-backlight}
- * nodes that do not exist on m95 [FACT 2026-08-14: /sys/class/leds holds
- * only lcd-backlight and mx-led; every LightsService battery/notification
- * set logged "Unknown error setting light"]. m95's only indicator LED is
- * the mono home-button halo "mx-led" (mt65xx-leds ISINK, max 255).
- *
- * Mapping:
- *   backlight                      -> /sys/class/leds/lcd-backlight/brightness
- *   battery/notifications/attention -> /sys/class/leds/mx-led (shared, with
- *       the usual priority attention > notifications > battery)
- *
- * Blink uses the ledtrig-timer delay_on/delay_off attrs. init.mt6797.rc
- * activates the timer trigger once at boot and chowns those attrs to
- * system (they are created root-only when the trigger first activates, and
- * ueventd cannot chown attrs that appear after coldboot). The trigger is
- * then LEFT ON "timer" permanently: with delay_off == 0 the LED core
- * treats the LED as solid-on, so steady light is delay_off=0 + brightness,
- * blink is delay_on/delay_off + brightness, off is brightness 0.
- *
- * 18.1 delta (FACT 2026-09-07, boot29/vendor28): on that boot the trigger was
- * back to "[none]" and delay_on/delay_off did not exist, although the init
- * block had run (mx-led/brightness and mx-led/trigger both carried the boot
- * mtime) -- so the init activation cannot be relied on by itself. Writing
- * "timer" from a shell as root re-created both attrs, and ueventd applied the
- * m95 sysfs rules to them at once (0664 system system), i.e. the HAL, which
- * runs as system and may write the 0664 trigger, can do the same. So
- * ensure_timer_trigger() re-arms it lazily on the first mx-led use if the
- * delay attrs are missing, and every blink write still degrades to solid
- * light instead of failing.
- */
+
 
 #define LOG_TAG "lights.m95"
 
@@ -142,33 +109,8 @@ static int rgb_to_brightness(const struct light_state_t *state)
             (29 * (color & 0xff))) >> 8;
 }
 
-/*
- * Flyme 13 (A13 GSI) does not pack the backlight level into an ARGB colour.
- * Its LightsService$LightImpl.setBrightness() converts the float to an int on
- * a 0..3515 scale (BrightnessSynchronizer.brightnessFloatToIntRange():
- * constrainedMap(0, 3515, 0, 1, f); 1.0..2.0 (HBM) -> 3516..7031) and passes
- * that int as `color` verbatim, alpha bits clear.  Before that, Flyme's
- * LocalDisplayAdapter hook (service-flyme.jar, FlymeDisplayAdapterInjectImpl.
- * clampHalBrightnessState) rescales the float: f' = clamp(3515 * f /
- * MAX_BRIGHTNESS_HAL, 0, 1), MAX_BRIGHTNESS_HAL = framework-res integer
- * 0x10e0147 (4095 by default, 20480 in the flyme-3g5 image).  So the raw int
- * we receive is f * 3515 * 3515 / 20480 = f * 603.3 (FACT 2026-09-12, measured
- * 603 at f = 1.0, 515 at 0.853, 343 at 0.569 - all smali of services.jar,
- * framework.jar and the apex jar of the flyme-3g5 image).  rgb_to_brightness()
- * of such a value is noise (4..29 for the whole slider), which was the
- * "brightness only moves a little" symptom.  AOSP/LOS always sets alpha = 0xff
- * and R=G=B, so the alpha byte is a safe discriminator.
- */
-/*
- * The raw maximum is therefore 3515 * 3515 / config_screenBrightnessHALMaximum
- * = 3017 (the resource is 4095 in the flyme-3g5 framework-res, read once in
- * DisplayManagerService.systemReady(), no overlay touches it).  The "603"
- * seen on some sweeps was the DIM policy (lock screen: 10 s activity timeout
- * -> brightness x0.2), not a different constant.  vendor.m95.brightness_hal_max
- * is an optional override for a Flyme build with another value; nothing sets
- * it on m95.  Verified 2026-09-12 in the bright policy: slider 100/1000/2000/
- * 3515 -> sysfs 7/73/145/255 -> lm36272 2046 of 2047.
- */
+
+
 #define FLYME_INT_MAX 3515u
 #define FLYME_HAL_MAX_DEFAULT 4095u
 

@@ -73,7 +73,7 @@ int _ZN7android14SurfaceControl7setSizeEjj(void* /*self*/, uint32_t /*w*/,
 // android::IDumpTunnel::asInterface(const sp<IBinder>&) -- MediaTek's N-era
 // libgui extension (dump tunnel from the composer into SurfaceFlinger), gone
 // from R libgui. libgui_ext.so imports it and hwcomposer.mt6797.so cannot load
-// without it (logcat 2026-09-06: "cannot locate symbol ... referenced by
+
 // /vendor/lib64/libgui_ext.so"). Returns a null sp<>.
 //
 // ABI note: android::sp<T> is 8 bytes but NOT trivially destructible, so on

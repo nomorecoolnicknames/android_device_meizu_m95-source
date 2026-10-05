@@ -47,10 +47,6 @@ allow { thermal thermald thermalloadalgod thermal_manager epdg_wod } null_device
 # read zone temps and write cooling-state/policy knobs.
 allow { thermal thermald thermalloadalgod thermal_manager } proc_mtk_thermal:file rw_file_perms;
 allow { thermal thermald thermalloadalgod thermal_manager } proc_mtk_thermal:dir r_dir_perms;
-# /proc/mtkcooler (typed 2026-09-25, file.te m95_proc_mtkcooler): the .tp
-# policies set per-cooler conditions there (decoded thermal.conf:
-# "/proc/mtkcooler/cpu_adaptive_0" -> "EXIT 6000", ...). Until the type existed
-# the generic `proc` grant in m95_enforcing.te covered it.
 allow thermal_manager m95_proc_mtkcooler:dir search;
 allow thermal_manager m95_proc_mtkcooler:file { read write open getattr };
 allow { thermal thermald thermalloadalgod thermal_manager } sysfs:dir r_dir_perms;

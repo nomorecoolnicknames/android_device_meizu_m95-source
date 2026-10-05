@@ -1,34 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-    Оверлей ВНУТРЕННЕЙ apns.xml фреймворка (перенос с 16.0, 2026-09-07).
 
-    В апстриме это пустая заглушка <apns version="8"></apns>. TelephonyProvider
-    .initDatabase() читает её В ДОПОЛНЕНИЕ к партнёрской базе, поэтому записи
-    отсюда ДОБАВЛЯЮТСЯ, а база LineageOS не форкается. Механика на Android 11
-    та же, что на Pie (проверено по дереву: TelephonyProvider.java:558 читает
-    com.android.internal.R.xml.apns, :710 getApnConfFile выбирает ОДИН
-    партнёрский файл — на R к списку добавился product-каталог, куда LOS 18.1
-    и кладёт apns-conf.xml).
-
-    version ОБЯЗАН совпадать с версией партнёрской базы (сейчас 8). При
-    расхождении TelephonyProvider бросает исключение и молча теряет ВСЮ
-    партнёрскую базу; канарейка в логе — "initDatabase: throwing exception due
-    to version mismatch".
-
-    Зачем запись: APN типа ims обязателен для IMS PDN. DcTracker
-    .buildWaitingApns фильтрует по типу, без ims-строки SETUP_DATA_CALL не
-    отправляется вовсе. Ни в стоковой, ни в базе LOS такой строки для 25002
-    нет; attach APN её не заменяет.
-
-    Значения apn="ims" и protocol="IP" — НЕ догадка: ровно на них 2026-08-27 на
-    LineageOS 16.0 этого аппарата поднялся IMS PDN и прошла регистрация
-    (200 OK / Reg[0]=Registered / +CIREGU: 1,1). protocol именно IP, а не
-    IPV4V6: MediaTek диспетчеризует SETUP_DATA_CALL по протоколу, и вариант
-    IPV4V6 уходит в requestSetupDataCallOverIPv6, чья раскладка расширенных
-    параметров не разобрана — pcscf_discovery_flag туда не доезжает.
-    bearer/network_type_bitmask намеренно не заданы (неверный отсёк бы строку
-    до LTE).
--->
 <apns version="8">
     <apn carrier="MegaFon IMS"
          mcc="250"
@@ -39,9 +10,6 @@
          roaming_protocol="IP"
          carrier_enabled="true" />
 
-    <!--
-  IMS APNs need carrier-specific validation; APN presence alone does not establish IMS registration.
--->
 
     <apn carrier="MTS IMS"
          mcc="250"

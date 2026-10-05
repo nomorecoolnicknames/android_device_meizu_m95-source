@@ -73,13 +73,7 @@ int ifc_ipv6_trigger_rs(const char *ifname) {
     return ret;
 }
 
-/* R brings two more MTK netutils additions (missing-symbol audit 2026-09-04):
- *  ifc_set_txq_state(const char *ifname, int state) — transmit-queue toggle,
- *    wanted by mtk-ril and /vendor/bin/thermal at dlopen;
- *  ifc_ccmni_md_cfg(...) — CCMNI modem-interface config, wanted by mtk-ril.
- * Signatures inferred from call sites (RIL phase refines from live strace).
- * Best-effort success: the data path works without them, only power/queue
- * tuning degrades. */
+
 int ifc_set_txq_state(const char *ifname, int state) {
     (void)ifname; (void)state;
     return 0;
@@ -89,17 +83,7 @@ int ifc_ccmni_md_cfg(const char *ifname, int md_id, int ccmni_idx, int op) {
     return 0;
 }
 
-/* ifc_set_throttle — the second libnetutils symbol N had and R lacks.
- *
- * FACT (DT_NEEDED-closure audit 2026-09-06, logcat vendor19 x104):
- *   CANNOT LINK EXECUTABLE "/vendor/bin/thermal": cannot locate symbol
- *   "ifc_set_throttle" referenced by "/vendor/bin/thermal"
- * thermal (ELF32) is the only consumer. Nougat's ifc_utils.c implemented it
- * as a tc-based rx/tx rate cap on an interface (kbps, -1 = clear); MTK's
- * thermal daemon calls it from its "throttle net" mitigation. On this port
- * the network is not what overheats (hps/CPU is), so the mitigation is a
- * no-op that reports success. ifc_ipv6_trigger_rs above is unchanged.
- */
+
 int ifc_set_throttle(const char *ifname, int rxKbps, int txKbps) {
     (void)ifname; (void)rxKbps; (void)txKbps;
     return 0;

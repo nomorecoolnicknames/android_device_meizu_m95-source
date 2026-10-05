@@ -27,7 +27,7 @@ allow hal_camera_default sysfs:file r_file_perms;
 #   avc: denied { find } for interface=android.hardware.graphics.mapper::IMapper
 #   sid=u:r:hal_camera_default:s0 pid=365
 #   tcontext=u:object_r:hal_graphics_mapper_hwservice:s0 permissive=1
-# -- <original-home>/m95-boot-ok.txt, 08-09 08:55:18.083
+# -- /home/gun/m95-boot-ok.txt, 08-09 08:55:18.083
 # Type is defined at system/sepolicy/public/hwservice.te:25.
 allow hal_camera_default hal_graphics_mapper_hwservice:hwservice_manager find;
 
@@ -258,10 +258,6 @@ binder_call(hal_camera_default, system_server)
 # surface as its own { set } denial and gets a labelled type, never default_prop.
 unix_socket_connect(hal_camera_default, property, init)
 
-# 2026-09-24 (A13): the 3A threads raise their own priority. FACT (192234):
-# denied { sys_nice } capability=23 comm=AESenThd / 3ATHREAD.
 allow hal_camera_default self:global_capability_class_set sys_nice;
 
-# 2026-09-25 (A13): persist.camera.* switches of the provider and of
-# libm95_camera_metadata_raw (property.te m95_camera_prop).
 get_prop(hal_camera_default, m95_camera_prop)

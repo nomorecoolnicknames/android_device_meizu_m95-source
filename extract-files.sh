@@ -86,8 +86,11 @@ fi
 
 function blob_fixup() {
     case "${1}" in
-        # No automatic fixups are declared here on purpose.  Every patched blob
-        # in this port was patched with a named, reviewed script under
+        vendor/lib/libmtkcam_sysutils.so)
+            python3 "${MY_DIR}/tools/camera-looper-compat.py" \
+                --abi vndk33-looper136 --file "${2}" --apply
+            ;;
+        # Other patched blobs use named, reviewed scripts under
         # meizu_mx6_m95/tools/blobpatch/ and is documented in
         # vendor/meizu/m95/proprietary-files.txt.  Re-implementing them as
         # silent sed/patchelf one-liners here would hide them.

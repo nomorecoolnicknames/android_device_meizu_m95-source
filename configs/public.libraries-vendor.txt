@@ -1,0 +1,16 @@
+# /vendor/etc/public.libraries.txt -- vendor libraries that applications may
+# load.  Replaces the stock copy (vendor/meizu/m95/proprietary/vendor/etc/
+# public.libraries.txt), whose two Trustonic entries are kept verbatim.
+#
+# Nothing here is preloaded: libnativeloader preloads only the SYSTEM public
+# list (art/libnativeloader/public_libraries.cpp preloadable_public_libraries).
+# A vendor entry is only linked from app namespaces into "sphal", and for
+# targetSdkVersion > 30 only for apps that name it in <uses-native-library>.
+libMcClient.so
+libMcRegistry.so
+# ForgeImsService (com.mediatek.ims) -> WifiOffloadService: tells MAL's ePDG
+# entity the SIM identity.  Loaded in "sphal", where its NEEDED all resolve:
+# libmal.so and libmdfx.so from /vendor/lib64, libnativehelper.so from
+# /vendor/lib64/hw (m95-vendor-extra.mk), libcutils/libutils/libc++ as VNDK-SP,
+# liblog/libc/libm/libdl as LLNDK.
+libwfo_jni.so

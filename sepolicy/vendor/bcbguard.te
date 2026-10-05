@@ -1,0 +1,24 @@
+# BCB auto-return guard, /vendor/bin/m95-bcbguard.sh run by the shared vendor
+# shell (rootdir/init.m95.bcbguard.rc, seclabel). The rc and the script are
+# installed only in test images (M95_TEST_BCBGUARD=true); the rules are always
+# compiled so the policy is the same for both.
+#
+# Domain: the platform's vendor_misc_writer, not an m95 one. Writing
+# misc_block_device (para carries the BCB, file_contexts) is neverallowed for
+# every domain outside a short list (system/sepolicy/private/domain.te:118-136,
+# checked with tools/m95-sepolicy/neverallow_vendor.sh), and
+# vendor_misc_writer is the list's entry for vendor code; its public policy
+# already grants the write (public/vendor_misc_writer.te). Added here: entry
+# through the vendor shell, the vendor toybox it calls, reading back the
+# 13-byte command field, and one line to /dev/kmsg.
+
+allow init vendor_misc_writer:process { transition rlimitinh siginh };
+allow vendor_misc_writer vendor_shell_exec:file { read open getattr execute entrypoint map };
+allow vendor_misc_writer init:process sigchld;
+allow vendor_misc_writer vendor_toolbox_exec:file { read open getattr execute execute_no_trans map };
+allow vendor_misc_writer vendor_file:dir { search read open getattr };
+allow vendor_misc_writer vendor_file:file r_file_perms;
+allow vendor_misc_writer self:fifo_file rw_file_perms;
+
+allow vendor_misc_writer misc_block_device:blk_file { open read getattr };
+allow vendor_misc_writer kmsg_device:chr_file { open write getattr };

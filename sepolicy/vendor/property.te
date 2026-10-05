@@ -1,29 +1,3 @@
-# Property types — Meizu MX6 (m95).
-# Deliberately small: only properties tied to domains this policy declares.
-# (The m681 template carries ~110 cm-14.1-era prop types, most unbound; that
-# pile is NOT copied. Add types here only together with a property_contexts
-# binding and a user.)
-#
-# Android 13 (2026-09-24, SELinux lane). Every type here is declared through
-# vendor_internal_prop / vendor_restricted_prop instead of a bare
-# `type X, property_type;`. A13 enforces property ownership
-# (private/property.te:57, enforce_sysprop_owner): a property type that is
-# neither system_, product_ nor vendor_property_type trips a neverallow for
-# every domain that reads it -- 54 rules in the host secilc run of the
-# 2026-09-16 policy. Rule of thumb used below:
-#   internal   -- only vendor domains (and init) touch it;
-#   restricted -- vendor sets, a core domain (radio, system_server,
-#                 surfaceflinger, bluetooth) also reads it.
-# Nothing here is vendor_public: no core domain may SET our properties
-# (private/property.te:324), which is why the adb-shell knob grant in
-# forge_ims_app.te is gone (use `adb root`; su is permissive on userdebug).
-#
-# NOTE: vendor_init gets NO right on vendor_property_type by default. Every
-# type that /vendor/build.prop sets or a vendor rc trigger reads needs its own
-# set_prop/get_prop(vendor_init, ...) -- see vendor_init.te. Build.prop is
-# loaded before init installs its SELinux log callback (system/core/init/
-# init.cpp:887 vs :901), so a missing grant here drops the property under
-# enforcing WITHOUT any avc line in dmesg or logcat.
 
 # WMT combo-chip state (persist.mtk.wcn.*, service.wcn.*) — set by the wmt
 # loader chain, read by the wifi/bt stack. [CONV]
@@ -82,7 +56,6 @@ vendor_internal_prop(m95_handover_prop)
 # grant on every unlabelled property on the device. [CONV]
 vendor_restricted_prop(m95_forge_prop)
 
-# Allow init to publish service state properties used by the VoLTE startup ordering.
 vendor_restricted_prop(m95_volte_svc_prop)
 
 # MTK vendor telephony/IMS knobs that a CORE process has to read.
@@ -121,25 +94,6 @@ vendor_restricted_prop(m95_volte_svc_prop)
 # теряют -- ниже воспроизведён тот же самый набор, что им давала платформа. [CONV]
 vendor_restricted_prop(m95_ims_vendor_prop)
 
-##############################################################################
-# 2026-09-24, SELinux lane: MTK names that land on platform types a vendor
-# domain may not touch on Android 13.
-#
-# FACT (system/sepolicy/public/property.te:236, private/property.te:66-73 and
-# the compatible_property_only block): default_prop is system_internal, so NO
-# vendor domain may read it; system_prop and net_radio_prop are
-# core_property_type, readable and settable by core domains and vendor_init
-# only; radio_prop is readable/settable only by core, app and
-# hal_telephony_server. The N-era MTK blobs read and write dozens of names in
-# those namespaces (strings of each daemon's /vendor DT_NEEDED closure,
-# captured in the design note). Relabelling the names is the only legal fix;
-# the alternative -- exemption attributes -- does not exist for these rules.
-#
-# Only names that are actually SET somewhere (vendor/build.prop, an rc file or
-# a daemon) are relabelled. A denied read of a property nobody sets returns
-# the same default an unlabelled read would, so the unset debug knobs stay on
-# the platform types and keep producing an (expected) avc line.
-##############################################################################
 
 # MTK feature/config switches: ro.mtk_*, persist.mtk_*, persist.mtk.*,
 # mtk.eccci.*, ro.telephony.sim.count, persist.chiptest*, the legacy
@@ -171,10 +125,6 @@ vendor_restricted_prop(m95_vendor_svc_prop)
 # prefix it is system_prop.
 vendor_internal_prop(m95_usb_prop)
 
-# debug.hwc.*: tuneables hwcomposer.mt6797.so publishes (debug.hwc.bq_count
-# and debug.hwc.compose_level were live in getprop, 2026-09-24 19:23). A vendor
-# domain may read debug_prop but not set it (compatible_property_only "Prevent
-# properties from being set"), which is what graphics.te used to grant.
 vendor_internal_prop(m95_hwc_debug_prop)
 
 # ro.vendor.vintf.legacy_kernel: set in vendor/build.prop, read by
@@ -187,11 +137,6 @@ vendor_internal_prop(m95_hwc_debug_prop)
 # capture m95-boot-20260924-192234.
 vendor_restricted_prop(m95_exported_vendor_prop)
 
-##############################################################################
-# 2026-09-24, SELinux lane: PREPARED for paths the captures did not exercise
-# (voice call, VoLTE). The names come from strings, not from denials; the
-# first call under permissive must confirm them (design note, "unknowns").
-##############################################################################
 
 # MTK audio-HAL state and feature switches: af.modem_{1,2,ext}.status,
 # af.recovery.{dl,ul,mic}_mute_on, af.rf_{info,mode}, af.ril.* (speech codec,
@@ -231,3 +176,7 @@ vendor_restricted_prop(m95_camera_prop)
 # (rootdir/m95-perfprofile.sh). Set by hand with `adb root`; nothing else
 # reads or sets them.
 vendor_internal_prop(m95_perfprofile_prop)
+
+# Power trap switch (persist.vendor.m95.powertrap), rootdir/init.m95.powertrap.rc.
+# Set by hand with `adb root`; read by the m95_powertrap service.
+vendor_internal_prop(m95_powertrap_prop)

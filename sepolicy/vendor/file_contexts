@@ -213,20 +213,6 @@
 # unlabelled (system_file) binary would fail to exec. m681 never added this and
 # only gets away with it because that port is permissive.
 /system/bin/goodixfingerprintd  u:object_r:fingerprintd_exec:s0
-# 2026-09-09, enforcing lane: on 18.1 this line matches NOTHING. The blob is
-# installed to /vendor/bin (vendor-18.1/meizu/m95/m95-vendor.mk:19), and the
-# live denial says so:
-#   avc: denied { entrypoint } path="/vendor/bin/goodixfingerprintd"
-#        scontext=u:r:fingerprintd:s0 tcontext=u:object_r:vendor_file:s0
-# Deliberately NOT fixed by relabelling the vendor path: fingerprintd_exec is
-# system_file_type (public/fingerprintd.te:2) and fingerprintd is a coredomain
-# (private/fingerprintd.te), so neither the label nor a vendor_file execute
-# grant is legal under public/domain.te:1328. The daemon needs a vendor domain
-# of its own -- full recipe in SELINUX_ENFORCING_PLAN.md §4.2. Under enforcing
-# as it stands today the daemon does not start and the fingerprint dies, so
-# this is a hard blocker, not a cosmetic one.
-# 2026-09-24 (A13): resolved -- the daemon has its vendor domain goodixfpd
-# (fingerprintd.te) and is labelled below.
 /(vendor|system/vendor)/bin/goodixfingerprintd  u:object_r:goodixfpd_exec:s0
 
 ##########################
@@ -408,17 +394,6 @@
 /(vendor|system/vendor)/lib(64)?/libm95shim_utils\.so   u:object_r:same_process_hal_file:s0
 /(vendor|system/vendor)/lib(64)?/libm95probe\.so        u:object_r:same_process_hal_file:s0
 
-# 2026-09-24 (Android 13, SELinux lane): the closure above was one link short.
-# libgpu_aux.so now pulls libdpframework.so, and through it the MDP/PQ/codec
-# helpers below. FACT (capture m95-boot-20260924-192234, dmesg): zygote,
-# surfaceflinger and bootanim take { execute } / { open read getattr } on
-# vendor_file for /vendor/lib{,64}/libdpframework.so, libbwc.so, libm4u.so,
-# libpq_prot.so and /vendor/lib/libstdc++.so. The kernel audits a
-# (domain, vendor_file, file, perm) tuple once per boot, so the log names only
-# the first library per permission; the full set is the readelf DT_NEEDED
-# closure of egl/libGLES_mali.so + hw/gralloc.mt6797.so on the built /vendor
-# (64- and 32-bit). Under enforcing any one of them missing means no EGL in
-# zygote, surfaceflinger or bootanim.
 /(vendor|system/vendor)/lib(64)?/libdpframework\.so      u:object_r:same_process_hal_file:s0
 /(vendor|system/vendor)/lib(64)?/libbwc\.so              u:object_r:same_process_hal_file:s0
 /(vendor|system/vendor)/lib(64)?/libm4u\.so              u:object_r:same_process_hal_file:s0
@@ -434,13 +409,8 @@
 /(vendor|system/vendor)/lib(64)?/libstdc\+\+\.so          u:object_r:same_process_hal_file:s0
 /(vendor|system/vendor)/lib(64)?/libnetutils\.so         u:object_r:same_process_hal_file:s0
 
-# A13 GSI (FACT 2026-09-11): the AOSP regex covers only ...-service, not the
-# .software variant this device installs; unlabeled -> init refuses to start it
-# -> LockSettingsService NPE on IGateKeeper.
 /(vendor|system/vendor)/bin/hw/android\.hardware\.gatekeeper@1\.0-service\.software  u:object_r:hal_gatekeeper_default_exec:s0
 
-##########################
-# 2026-09-24 (Android 13, SELinux lane).
 
 # HIDL clearkey. A13's system/sepolicy/vendor/file_contexts:36 labels only the
 # AIDL android.hardware.drm-service.clearkey; the @1.4 HIDL binary this build
@@ -462,3 +432,11 @@
 
 # Modem config store (file.te ccci_cfg_file).
 /data/ccci_cfg(/.*)?    u:object_r:ccci_cfg_file:s0
+
+# SPM firmware trigger (sepolicy/vendor/spm.te, rootdir/init.mt6797.rc spm_script).
+/dev/spm                              u:object_r:spm_device:s0
+/(system/)?vendor/bin/spm_loader      u:object_r:spm_loader_exec:s0
+
+# Power trap output (sepolicy/vendor/powertrap.te, rootdir/init.m95.powertrap.rc).
+/data/vendor/m95-powertrap(/.*)?      u:object_r:m95_powertrap_data_file:s0
+/(vendor|system/vendor)/bin/hw/android\.hardware\.thermal@2\.0-service\.m95  u:object_r:hal_thermal_default_exec:s0

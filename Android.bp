@@ -1,6 +1,6 @@
 // Soong namespace for the m95 device tree.
 //
-// WHY (FACT, measured 2026-09-16 on this tree): every Android.bp without a
+
 // soong_namespace lands in the root namespace "." (build/soong/android/
 // namespace.go:193), soong_build always exports "." to kati (build/soong/cmd/
 // soong_build/main.go:106), and every module of an exported namespace gets

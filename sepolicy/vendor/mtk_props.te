@@ -1,14 +1,3 @@
-# Readers and writers of the MTK property types added for Android 13
-# (property.te, bottom block; names in property_contexts, bottom block).
-#
-# Sources, in order of weight:
-#   FACT  avc denials of the two permissive boots of 2026-09-24
-#         (captures m95-boot-20260924-113630 and -192234);
-#   FACT  property names in the strings of each daemon's /vendor DT_NEEDED
-#         closure, mapped through the built property_contexts;
-#   FACT  vendor/build.prop and vendor rc files of the b11 image.
-# A property read is logged once per (domain, property page) per boot, so a
-# denial names the page, never the property; the name comes from the strings.
 
 ##############################################################################
 # m95_mtk_config_prop -- ro.mtk_*, persist.mtk*, mtk.eccci.*, ...
@@ -62,11 +51,6 @@ set_prop(hal_graphics_composer_default, m95_hwc_debug_prop)
 # ro.vendor.vintf.legacy_kernel, read by system_server's VintfObject JNI.
 get_prop(system_server, m95_exported_vendor_prop)
 
-##############################################################################
-# PREPARED (call / VoLTE paths, not exercised in the 2026-09-24 captures).
-##############################################################################
-# The audio HAL keeps modem-speech and mute-recovery state in af.* and reads
-# its persist.af.* feature switches.
 set_prop(hal_audio_default, m95_audio_hal_prop)
 # VoLTE daemons publish and read their IMS bookkeeping.
 set_prop({ volte_ua volte_stack volte_imcb }, m95_volte_prop)

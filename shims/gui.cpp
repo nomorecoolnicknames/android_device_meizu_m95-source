@@ -12,7 +12,7 @@
 // libgui, which exists under VNDK-lite (M95_VNDK_LITE, the bring-up default).
 // Under strict isolation this forwarder cannot work (no system libgui in the
 // vendor namespace) — strict flip requires replacing the HWC1 blob path,
-// tracked in VENDOR_A11_BLOB_AUDIT.md §5.
+
 namespace android {
 template <typename T>
 class sp;
@@ -38,7 +38,7 @@ void _ZN7android11BufferQueue17createBufferQueueEPNS_2spINS_22IGraphicBufferProd
 
 }  // extern "C"
 
-// ---- Camera closure (vendor20 DT_NEEDED-closure audit, 2026-09-06) --------
+
 // libmtkcam_imgbuf.so imports the N 7-arg GraphicBuffer ctor, libeffecthal.base
 // the N GraphicBuffer(ANativeWindowBuffer*, bool) ctor plus the N
 // BufferItemConsumer ctor (uint32_t usage) and BufferItemConsumer::setName.

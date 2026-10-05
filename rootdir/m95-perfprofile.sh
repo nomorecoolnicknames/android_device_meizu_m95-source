@@ -1,31 +1,3 @@
-# Performance / thermal profile for the MX6 (m95, MT6797 Helio X20).
-#
-# Sourced by m95-cpuset.sh, and only when persist.vendor.m95.perfprofile=1.
-# The property is read once, at service start: set it and reboot. With the
-# property unset the device behaves exactly as it did before this file existed.
-# Every value, the source line it rests on and the marker that shows it took
-# effect: meizu-fleet/designs/M95_PERF_PROFILE_20260925.md. Kernel paths below
-# are relative to meizu_mx6_m95/kernel/m685.
-#
-# WHAT IT IS FOR (capture meizu-fleet/captures/m95-perf-game-20260924.log):
-# in a 3D game mtktscpu went 64 -> 91-99 C in 15 s, the GPU was cut to its
-# lowest OPP (g_limited_max_id=6, 238 MHz) and the A72 pair stayed at
-# 2314 MHz. Three mechanisms, read in source:
-#
-#  1. The vendor policy thermal.conf gives ATM floors of 560 mW CPU and 360 mW
-#     GPU (clatm_setting id 0; the capture's "limited power = 560" is that
-#     floor). 360 mW buys only GPU OPP 6.
-#  2. PPM spends the CPU budget without the A72. It plans to switch cores off
-#     when the budget is small; with hps off (m95-cpuset.sh) nothing switches
-#     them off, and a cluster PPM believes empty gets no frequency cap at all
-#     (ppm_v1/src/mt_ppm_main.c:144-147, 362-366; the power state is also
-#     dropped to LL_ONLY by budget, mt_ppm_main.c:845-849). INFERENCE: that is
-#     why the A72 ran uncapped while the A53s and the GPU starved.
-#  3. The interactive governor ignores hispeed_freq for the A53-L and A72
-#     clusters in the default power mode and sends them straight to their top
-#     OPP on any load over go_hispeed_load (drivers/cpufreq/
-#     cpufreq_interactive.c:399-402) -- the least efficient point of the A72:
-#     1512 mW per core at 2314 MHz against 966 at 1781 (ppm_v1 power table).
 
 # Sub-switches, read once like the main one.
 #   persist.vendor.m95.perfprofile.big  = 0: keep the A72 pair (cpu8-9)
@@ -190,18 +162,6 @@ pp_once() {
     pp_gov_once
 }
 
-# CORES. hps_suspend() offlines cpu8-9 on every suspend, even with hps off,
-# and nothing brings them back (mt_hotplug_strategy_main.c:430-454;
-# enable_nonboot_cpus only restores the cores it took down itself). Without
-# this the A72 are gone after the first sleep on battery.
-#
-# park=1 (EXPERIMENTAL, default off): after two dark passes, offline every
-# core but cpu0 until the screen comes back. On this SoC deep idle and SODI
-# are entered only with a single core online (base/power/spm_v2/mt_idle.c:
-# 600-603) and per-core idle (MCDI) is compiled out, so with ten cores online
-# the SoC never idles deeply while awake. It also caps a background hog at
-# one A53. Cost: nine cpu_down per screen-off, the operation behind the
-# 2026-09-06 hps panic (m95-cpuset.sh) -- soak test before trusting it.
 BL=/sys/class/leds/lcd-backlight/brightness
 PP_DARK=0
 PP_PARKED=0

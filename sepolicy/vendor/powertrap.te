@@ -1,0 +1,44 @@
+# Power trap, /vendor/bin/m95-powertrap.sh run by the shared vendor shell
+# (rootdir/init.m95.powertrap.rc, seclabel -- same pattern as m95_cpuset in
+# m95_scripts.te). Debug tool, off unless persist.vendor.m95.powertrap=1.
+#
+# [CONV] prepared under permissive, from the paths the script names; not yet
+# seen as denials. Two things are deliberately NOT granted, so under
+# enforcing they fail quietly and the trap keeps the rest:
+#  - the kernel log (kernel:system syslog_read): a vendor domain reading all
+#    of dmesg is exactly what the platform policy keeps to logd/dumpstate;
+#    after a power-off the same lines are in pstore anyway;
+#  - debugfs: m95_enforcing.te and hal_memtrack_default.te keep it closed for
+#    every vendor domain (one label for the whole kernel debug surface).
+
+type m95_powertrap, domain;
+allow init m95_powertrap:process { transition rlimitinh siginh };
+allow m95_powertrap vendor_shell_exec:file { read open getattr execute entrypoint map };
+allow m95_powertrap init:process sigchld;
+allow m95_powertrap vendor_toolbox_exec:file { read open getattr execute execute_no_trans map };
+allow m95_powertrap vendor_file:dir { search read open getattr };
+allow m95_powertrap vendor_file:file r_file_perms;
+allow m95_powertrap self:fifo_file rw_file_perms;
+
+# The switch.
+get_prop(m95_powertrap, m95_powertrap_prop)
+
+# Output: /data/vendor/m95-powertrap (file_contexts), created root:system 0770
+# by the rc at post-fs-data.
+type m95_powertrap_data_file, file_type, data_file_type;
+allow m95_powertrap m95_powertrap_data_file:dir create_dir_perms;
+allow m95_powertrap m95_powertrap_data_file:file create_file_perms;
+
+# What each csv column reads.
+r_dir_file(m95_powertrap, sysfs_batteryinfo)
+r_dir_file(m95_powertrap, sysfs_thermal)
+r_dir_file(m95_powertrap, sysfs_leds)
+r_dir_file(m95_powertrap, sysfs_devices_system_cpu)
+allow m95_powertrap sysfs:dir r_dir_perms;
+allow m95_powertrap sysfs:file r_file_perms;
+allow m95_powertrap sysfs:lnk_file read;
+allow m95_powertrap proc_uptime:file r_file_perms;
+
+# `mkdir /data/vendor/m95-powertrap` at post-fs-data runs as vendor_init; the
+# parent is vendor_data_file, which vendor_init already writes.
+allow vendor_init m95_powertrap_data_file:dir { create search getattr open read setattr };

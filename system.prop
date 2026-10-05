@@ -1,4 +1,4 @@
-# system.prop — Meizu MX6 (m95) on LineageOS 18.1. System-side properties.
+# system.prop — Meizu MX6 (m95) on LineageOS 20 (Android 13). System-side properties.
 # StrictMode off for system processes (userdebug WTF dialog covered the
 # screen every boot — FACT, LOS16 tree).
 persist.sys.strictmode.disable=true
@@ -10,15 +10,26 @@ persist.dbg.volte_avail_ovr=1
 # SurfaceFlinger keeps a continuous transaction trace on non-user builds
 # (SurfaceFlinger.cpp:450-451); this product is userdebug (M95_PERF_AUDIT P1-3).
 debug.sf.enable_transaction_tracing=false
-# Legacy GLES RenderEngine: Skia-GL faults Mali r12p1 (FLYME13_KERNEL_PLAN.md:415-419).
-# System-side copy of vendor.prop:131 / init.mt6797.rc:59.
+
+# Privacy: framework and ForgeImsService (donor code, kept unmodified) tags that
+# print the ICCID or numbers at DEBUG (FACT, radio captures 25-26.09; the vendor
+# half and the rationale are in vendor.prop next to log.tag.AT).
+#   SubscriptionController  ICCID, own number
+#   SuppServExt, ImsConfigManager  ICCID;  ImsUtImpl  call-forwarding number
+#   @M_ImsSimservsDispatcher  own IMS identity (XUI)
+log.tag.SubscriptionController=I
+log.tag.SuppServExt=I
+log.tag.ImsConfigManager=I
+log.tag.ImsUtImpl=I
+log.tag.@M_ImsSimservsDispatcher=I
 debug.renderengine.backend=gles
 
-# adbd legacy (non-AIO) FFS path -- this 3.18 f_fs.c has no AIO, see the
-# comment next to sys.usb.ffs.aio_compat in vendor.prop. Moved here from
-# vendor.prop (2026-09-24): on default_prop it is settable from
-# system/build.prop (init context) but not from vendor/build.prop
-# (vendor_init context), and under enforcing the vendor copy would be dropped
-# without an avc line -- adb over USB would then run the nonblocking path
-# that cannot work on this kernel.
 ro.adb.nonblocking_ffs=false
+
+# adb on USB from the first boot. build/make/tools/post_process_props.py:31-40
+# adds this only when ro.adb.secure=0, so with authorisation on (the default
+# since #28, device.mk M95_INSECURE_ADB) adb would start switched off and the
+# keys in /adb_keys would be useless. Authorisation still applies: computers
+# not in /adb_keys are asked for on the screen. Here and not in vendor.prop for
+# the reason given above (vendor_init may not set it).
+persist.sys.usb.config=adb

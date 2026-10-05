@@ -33,7 +33,7 @@ cc_library_shared {
 // every library against the whole breadth-first local group
 // (bionic/linker/linker.cpp:730-756, 1794-1810), so the consumers' symbols
 // land in the ONE libgui_vendor of the process. Soong links without
-// --as-needed, so the DT_NEEDED survives. Model check (meizu-fleet/tools/
+
 // m95_linkaudit.py, all 47 libgui_m95 consumers): the same 262 symbols bind
 // to libgui_vendor.so as with a symlink, one libgui instance per process.
 cc_library_shared {
@@ -153,9 +153,9 @@ cc_library_shared {
     compile_multilib: "32",
 }
 
-// libm95probe is NOT linked by anything at build time; blobs get it via
-// patchelf --add-needed (vendor-18.1/wire-shims.py). Loaded for its
-// constructor side effect only (dlopen proof without logd).
+// libm95probe is NOT linked by anything at build time; six blobs still NEED it
+// via patchelf --add-needed (vendor-18.1/wire-shims.py). Empty since
+
 cc_library_shared {
     name: "libm95probe",
     defaults: ["m95shim_defaults"],
@@ -172,7 +172,7 @@ cc_library_shared {
     shared_libs: ["libdl"],
 }
 
-// ---- ports of the LOS16 device shims (los/device/meizu/m95/shims), 2026-09-06.
+
 // Same blobs, same holes; R only widened them (libnetutils lost
 // ifc_set_throttle, BoringSSL lost SSLv3). `stem` keeps the DT_NEEDED / dlopen
 // filename the blob expects while the Soong module name stays unique
@@ -225,7 +225,7 @@ cc_library_shared {
     srcs: ["android_runtime.cpp"],
 }
 
-// Strict-VNDK pre-flip set (VNDK_FULL_PREFLIP_BOOT_AUDIT.md §5): overlink
+
 // placebos and JNI shims that close the camera chain
 // (camera.mt6797.so -> libcam.paramsmgr -> libcam.common.meizu -> libandroid /
 // libjnigraphics / libandroid_runtime / libmeizucamera) and the audio HAL's
@@ -300,10 +300,23 @@ cc_library_shared {
 // libperfservicenative.so replacement (see perfservice.c): MTK PerfService
 // client that succeeds locally; the stock blob deadlocks the camera provider
 // (CpuCtrlImp) without the perfservice daemon. Blob copies removed from
-// m95-vendor.mk (2026-09-06).
+
 cc_library_shared {
     name: "libm95shim_perfservice",
     defaults: ["m95shim_defaults"],
     stem: "libperfservicenative",
     srcs: ["perfservice.c"],
+}
+
+// VoLTE log filter (see volte_log.c): drops INFO-and-below lines of VoLTE*
+// tags -- whole SIP messages with IMSI/IMEI/numbers -- in volte_stack,
+// volte_ua and volte_imcb. 32-bit: the three daemons are 32-bit. Installed
+// and wired (TARGET_LD_SHIM_LIBS) only with M95_VOLTE_LOGFILTER=true.
+cc_library_shared {
+    name: "libm95volte_logfilter",
+    defaults: ["m95shim_defaults"],
+    srcs: ["volte_log.c"],
+    shared_libs: ["liblog"],
+    compile_multilib: "32",
+    cflags: ["-Wall", "-Werror"],
 }

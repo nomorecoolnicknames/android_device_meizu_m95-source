@@ -2,7 +2,7 @@
 // the stock MTK libril (shipped renamed as /vendor/lib64/librilimp.so) keeps
 // as a *by-value* stack/heap local.
 //
-// Nougat and Android 13 Parcel sizes differ
+// THE BUG (FACT, capture m95-b16-rild-crash-20260924)
 // ---------------------------------------------------
 // librilimp was compiled against Nougat, where sizeof(android::Parcel) on LP64
 // is 104 bytes. On Android 13 it is 120 (Parcel grew mVariantFields et al., and
@@ -44,6 +44,8 @@
 //  * String16 is a single char16_t* on both N and A13 (8 bytes), so the
 //    by-value readString16()/writeString16(String16&) hand-off keeps working.
 //
+
+// evidence chain and the next-capture verification commands.
 
 #include <cstddef>
 #include <cstdint>

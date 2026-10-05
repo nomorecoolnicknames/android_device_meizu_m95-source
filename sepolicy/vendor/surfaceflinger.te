@@ -1,28 +1,3 @@
-# surfaceflinger on this device additionally serves on /dev/vndbinder
-# (ro.vendor.sf.vndbinder + tools/patches/surfaceflinger-publish-vndbinder.patch;
-# decode lane 2026-08-15, VENC_LANE.md): the MTK GuiExt pool inside
-# composer@2.1-service resolves "SurfaceFlinger" there before handing
-# MtkOmxVdec its surface output buffers.
-#
-# A coredomain touching vndbinder_device/vndservice_manager_type collides with
-# the full_treble_only() neverallows in system/sepolicy/public/domain.te.
-#
-# CORRECTION 2026-09-09 (enforcing lane; the claim below was inherited from the
-# LOS16 port, where it was true, and is FALSE on 18.1). This file used to say
-# the rules were legal because the device builds with
-# PRODUCT_FULL_TREBLE_OVERRIDE := false "(lineage_m95.mk)". There is no such
-# assignment in lineage_m95.mk at all -- line 26 there is a VoLTE comment --
-# and BoardConfig.mk:113 sets PRODUCT_FULL_TREBLE_OVERRIDE := true.
-#
-# Measured, not argued: the neverallows ARE in the compiled policy --
-# `grep -c "(neverallow ... vndbinder_device"` over
-# out/.../system/etc/selinux/plat_sepolicy.cil gives 14, and 10 for
-# vndservice_manager_type. Which is exactly why both rules below stay dropped:
-# there is no exempting attribute for a coredomain on vndbinder, so this is not
-# "forward hygiene pending a boot" -- it is a road that is closed. See
-# SELINUX_ENFORCING_PLAN.md corner (в3).
-# R-SPLIT-DROP (vndbinder mirror off): vndbinder_use(surfaceflinger)
-# R-SPLIT-DROP (R neverallow, permissive covers; re-add from denials): allow surfaceflinger surfaceflinger_vndservice:service_manager add;
 
 # The composer process is the observed vndbinder-side consumer
 # (BpServiceManager::getService loop in Binder:378_2, capture venc_stk378.txt).

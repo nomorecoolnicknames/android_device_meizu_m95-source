@@ -1,0 +1,20 @@
+
+on init
+    start m95_bcbguard_arm
+
+on property:sys.boot_completed=1
+    start m95_bcbguard_clear
+
+service m95_bcbguard_arm /vendor/bin/sh /vendor/bin/m95-bcbguard.sh arm
+    seclabel u:r:vendor_misc_writer:s0
+    user root
+    group root
+    disabled
+    oneshot
+
+service m95_bcbguard_clear /vendor/bin/sh /vendor/bin/m95-bcbguard.sh clear 300
+    seclabel u:r:vendor_misc_writer:s0
+    user root
+    group root
+    disabled
+    oneshot

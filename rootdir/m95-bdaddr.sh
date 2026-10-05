@@ -18,7 +18,7 @@
 #
 # The address itself is present and correct: /data/nvram/APCFG/APRDEB/BT_Addr
 # is the MTK ap_nvram_btradio_struct record, whose first member is addr[6], and
-# on this unit those six bytes read <factory address omitted> - first octet 0x90 has
+# on this unit those six bytes read 90 f0 52 41 35 d6 - first octet 0x90 has
 # neither the multicast nor the locally-administered bit set, so it is a
 # genuine factory OUI address in natural byte order, not a reversed or
 # generated one.

@@ -1,0 +1,18 @@
+# Libraries from the stock Flyme image that the Meizu camera loads by name.
+#
+# This list, unlike public.libraries.txt, is not preloaded into every process --
+# it only permits an application to load what it names. That distinction matters
+# here: the library is 32-bit only, and putting it in the preloaded list took
+# every 64-bit service down with it.
+#
+# The loader enforces the naming rule with a deliberate abort: a name here must
+# begin with lib and end with .meizu.so, so the file is installed under that
+# name and the application asks for it by it.
+libsurfacetexture_bitmap.meizu.so
+# The preview's face-beauty and makeup renderers are platform libraries too, and
+# the front camera cannot come up without the first of them: its draw path calls
+# VideoFaceBeautyRender.nativeInit, and with the library unloadable that throws
+# inside onDraw, which the GL renderer reports as fatal and the application dies
+# on the camera switch.
+libvfb_render.meizu.so
+libvmp_render.meizu.so

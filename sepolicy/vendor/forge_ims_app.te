@@ -48,65 +48,11 @@ allow radio mtkmal:unix_stream_socket connectto;
 allow radio device:dir search;
 allow radio devpts:chr_file rw_file_perms;
 
-# 2026-09-09: the kick has to know whether volte_imcb is there to answer it.
-# The modem runs its IMC handshake against the daemon over /dev/ccci_imsc, not
-# against the AT channel, so AT+EIMS=1 sent while the daemon is absent burns the
-# modem's ~12 s window for nothing (b26: AT+EIMS=1 18:11:03.593 -> +EIMCFLAG: 0
-# 18:11:16, daemons up 18:11:24). ImsService now polls init.svc.volte_imcb
-# before kicking. init.svc.* carries no vendor./odm. prefix here, so it falls
-# through to the catch-all in private/property_contexts:114 -- default_prop --
-# and AOSP grants radio no read on it. Harmless today (the device is permissive)
-# and required the moment it is not.
 get_prop(radio, default_prop)
 
-# 2026-09-09, enforcing lane: the two typed reads that make the blanket
-# default_prop grant above unnecessary. Kept side by side on purpose -- the
-# blanket rule is what is running on the device today, the typed pair is what
-# should replace it, and dropping the blanket one is a change to verify on a
-# boot (SELINUX_ENFORCING_PLAN.md, step E3), not a paper edit.
-#   persist.forge.*   -> m95_forge_prop      (the knobs ImsService reads)
-#   init.svc.volte_*  -> m95_volte_svc_prop  (daemon readiness it polls)
 get_prop(radio, m95_forge_prop)
 get_prop(radio, m95_volte_svc_prop)
 
-# Поправка того же дня (повод -- разбор линии volte-review, вывод уточнён
-# замером собранной политики, а не чтением исходника).
-#
-# Комментарий над бланкетным правилом утверждает, что AOSP не даёт radio читать
-# default_prop -- это НЕ ТАК. default_prop несёт атрибут core_property_type
-# (public/property.te:316), и в СОБРАННОЙ политике этого аппарата стоит
-#   (allow domain core_property_type (file (read getattr map open)))
-# (out/.../system/etc/selinux/plat_sepolicy.cil) -- то есть грант выдан ВСЕМ
-# доменам. Бланкетное правило избыточно.
-#
-# Почему именно всем, а не {coredomain appdomain shell}: у private/domain.te
-# две ветки, и здесь активна compatible_property_not_set (строка 75), потому что
-# PRODUCT_COMPATIBLE_PROPERTY = false. FACT (`get_build_var`): эффективный
-# PRODUCT_SHIPPING_API_LEVEL на этой сборке = **25**, а не 30. В device.mk:65
-# стоит 30, но lineage_m95.mk:42 инherit-ит product_launched_with_n_mr1.mk,
-# который ставит 25, и делает это ПОСЛЕ device.mk. Смотреть на device.mk и
-# делать вывод про ветку -- ошибка, которую здесь уже совершили дважды.
-#
-# А два get_prop выше -- не «замена» бланкетному правилу, а то, что делает явное
-# правило ОБЯЗАТЕЛЬНЫМ: типизация выводит persist.forge.* и init.svc.volte_* ИЗ
-# core_property_type, и платформенный грант на них больше не распространяется.
-# Побочно это делает аппарат нечувствительным к тому, что ветка когда-нибудь
-# переключится: если shipping API поправят на 30, платформа сузит грант до
-# {coredomain appdomain shell}, а наши свойства к тому времени уже названы явно.
-#
-# Побочная выгода типизации, ради которой она в том числе и делалась: свои
-# ctl-права. Установить свойство с core-типом нельзя никому, кроме init
-# (public/domain.te:527 -- neverallow на default_prop:property_service set), а
-# persist.forge.* -- это ручки bring-up, которые крутят через adb. Со своим
-# типом это выражается явно и только на отладочной сборке.
-#
-# 2026-09-24 (A13): the set half is gone. m95_forge_prop is a vendor type now
-# (vendor_restricted_prop, property.te), and private/property.te:324 forbids
-# any core domain but init to set a vendor property -- shell included; the
-# only escape is the system_writes_vendor_properties_violators attribute,
-# which is not worth spending on a bring-up knob. Set the knobs as root
-# instead: `adb root; adb shell setprop persist.forge.<knob> <v>` -- su is a
-# permissive domain on userdebug (private/su.te), so no rule is needed.
 userdebug_or_eng(`
   get_prop(shell, m95_forge_prop)
 ')
