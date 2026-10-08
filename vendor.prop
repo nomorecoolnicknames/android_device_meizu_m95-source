@@ -4,9 +4,7 @@
 # to the vendor partition under the split-property rules (R and later).
 #
 
-
 ro.sf.lcd_density=480
-
 
 ro.hardware.gralloc=mt6797
 ro.hardware.hwcomposer=mt6797
@@ -53,7 +51,6 @@ ro.mtk_enable_md3=1
 # MAL -> rild socket (bypasses disabled ril-proxy; see LOS16 notes).
 ril.mal.socket=rild-mal
 
-
 persist.mtk_ims_support=1
 persist.mtk_volte_support=1
 persist.mtk.volte.enable=1
@@ -67,7 +64,6 @@ ro.mtk_trustonic_tee_support=1
 ro.mtk_pq_support=3
 ro.mtk_pq_color_mode=1
 
-
 ro.vendor.wifi.connect_ssid_only=1
 
 # Station and P2P interface names, VERBATIM stock build.prop.
@@ -80,55 +76,11 @@ wifi.direct.interface=p2p0
 # wifi_chip.cpp:108-124, 1975-1981).
 ro.vendor.wifi.sap.interface=ap0
 
-
 persist.mtk.camera.log_level=0
 
-# Camera HAL version. camera.mt6797.so reads this and reports device_version
-# 0x303 (Camera2 HAL 3.3) instead of 0x100 for both sensors. It is the LOS16
-# setting too, but there it lived in rootdir/default.prop, which A11 never
-# installs -- on 18.1 the property was empty, both cameras came up as
-# device@1.0, and the legacy path crashed the provider: MTK's DisplayClient
-# recovers an ANativeWindowBuffer by subtracting the N handle offset from what
-# preview_stream_ops::dequeue_buffer returned, while the Treble HAL1 wrapper
-# (hardware/interfaces/camera/device/1.0/default/CameraDevice.cpp) returns a
-# pointer into its mCirculatingBuffers map, so common.incRef was garbage
-
-# HAL3 does not use DisplayClient at all.
 debug.camera.force_device=3
 
-
-# advertises BLOB/JPEG up to 4096x3072 but caps YCbCr_420_888 at 1920x1088, and
-# the AOSP camera app's CaptureModule captures YUV and encodes the JPEG itself
-# (CAM_JpegUtilNative "Compressing jpeg with size = (1920, 1088)"), so the
-# vendor YUV ceiling is the real picture-size ceiling -- 1088x1450 after crop.
-# offerLargeYuvSizes() in CameraModule.cpp adds 4096x3072 / 3264x2448 /
-# 2560x1920 YUV rows for the rear module and 2592x1944 for the front one, at a
-# published 30 fps so getOutputSizes() shows them (anything slower than 20 fps
-# the framework hides in getHighResolutionOutputSizes, which this app never
-# asks). Paired with the checkStream blob patch, without which the vendor's own
-# validator rejects the sizes it does not carry in tag 0xd000a.
 persist.camera.big_yuv=1
-
-
-
-# availableStreamConfigurations carries formats 33/34/35/YV12 only, and Google
-# Camera 8.9 (BSG MGC) dies at start on a null where the list of raw sizes should
-# be -- the LOS16 failure again ("Attempt to get length of null array" in
-# MetadataConverter.getGcamRawFormat, meizu_mx6_m95/analysis-lanes/gcam-builds.md
-# :91-93,176-182). GCam walks formats 32 -> 37 -> 35 on EVERY camera it
-# enumerates, and getOutputSizes() of an absent format is null, so the front
-# module needs a row exactly as much as the back one does.
-#   fake_raw  -- normalizeRawStreamConfigurations() in CameraModule.cpp adds
-#                RAW16 4032x3016 (the IMX386 pixel array) with 30 fps durations;
-#                without it dropUnbackedRawCapability() strips the RAW claim.
-#   raw_front -- the same for the OV5695 at its own 2592x1944; it only acts
-#                when fake_raw is also set.
-# These are claims in the framework copy only. AppStreamMgr::checkStream judges
-# the vendor copy of tag 0xd000a, so on their own they get GCam past its start,
-# not a raw frame: on LOS16 Arnova 5.1.018 photographed (HDR+ over YUV) with
-# exactly this pair, and the 7.3 builds, which configure a raw stream, went black.
-# Real RAW16 delivery needs a RAW row in the vendor copy too: on LOS16 a 24 MB
-# DNG came out only while that row existed (analysis-lanes/stream-table.md, the
 
 persist.camera.fake_raw=1
 persist.camera.raw_front=1
@@ -143,49 +95,14 @@ persist.camera.raw_front=1
 # provider restart. The front sensor is not touched here.
 persist.camera.raw=1
 
-# 4:3 viewfinder sizes for both cameras: libm95_camera_metadata_raw appends
-# YCbCr_420_888 1440x1080 and 1280x960 (30 fps, no stall) to the vendor stream
-# table, and MetadataProvider::updateData copies every YUV output row into
-
-
-# size is 640x480, which Google Camera stretches over the screen. 1440x1080 is
-# the stock HAL1 preview (CAMERA_PREVIEW_WIDTH_TRIAGE.md, wdmao-1440x1080).
-# 0 (or unset) drops the rows after a provider restart.
 persist.camera.preview_43=1
 
-# RAW16 buffers the framework may keep in flight (camera.device@3.3 legacy
-# convert.cpp, hardware/interfaces 5d56788fd). The MTK HAL answers 1, which
-# limits Google Camera's ZSL session (RAW16 in every request) to one request
-# at a time: 3.1 fps rear while the sensor runs 16.6. With 4: rear 12.4 fps,
-
-# build 34, meizu-fleet designs/MX6_A13_COMPONENT_COVERAGE_20261005.md s.24).
-# 0 (or unset) gives back the HAL's own value after a GCam restart.
 persist.camera.raw_maxbuf=4
-
 
 log.tag.AudioParamParser=S
 log.tag.SensorHAL=I
-# PQ: libdpframework asks the PQ service for its tuning ashmem on every camera
-# frame and logs "[PQ][PQConfig] getAshmemContext failed" when it is not there
-
-# The service stays off (init.mt6797.rc, persist.m95.pq.enable): with it on,
-# the 32-bit camera provider aborts in libpqservice PQClient::getAshmem with
-# "stack corruption detected" (Nougat blob, A13 libbinder; tombstone_28 of
-
 log.tag.PQ=S
 
-
-
-# m95-diag-20260929.md s.12). liblog drops a line below the tag's level before
-# it reaches logd or pmsg. To debug, raise one for the session:
-# `setprop log.tag.AT D` (not persistent).
-#   AT, RIL      mtk-ril at INFO: dialled and incoming numbers (ATD, +EAIC),
-#                IMEI (+EGMR/+CGSN answers)
-#   MAL-SIMMNGR  IMEI at INFO;  MAL-IMSM  IMEI at DEBUG
-#   VoLTE_Auto_Testing  numbers at INFO
-# NOT covered: volte_stack logs whole SIP messages (IMSI, IMEI, numbers) at
-# INFO under tags with a space ("VoLTE REG", "VoLTE SIPTX", "VoLTE SMS"),
-# which no log.tag.* property can name -- see the audit note.
 log.tag.AT=W
 log.tag.RIL=W
 log.tag.MAL-SIMMNGR=W
@@ -195,21 +112,8 @@ log.tag.VoLTE_Auto_Testing=W
 # wmt_launcher fwlog default (blob assumes 0 when absent).
 persist.mtk.wcn.fwlog.status=0
 
-# adbd transport: this 3.18 f_fs.c has no AIO at all (zero aio/io_submit
-# references), so the R nonblocking path (io_submit on ep files) can never
-# work. Force the legacy sync path (usb.cpp: ro.adb.nonblocking_ffs) AND the
-# non-AIO read/write inside it (usb_legacy.cpp: sys.usb.ffs.aio_compat).
-# init.mt6797.usb.rc sets the second one at early-init as well.
-
-# platform name (default_prop), which vendor_init may not set, so from this
-# file it would be dropped under enforcing -- silently, since build.prop is
-# loaded before init's SELinux logging is up (sepolicy/vendor/vendor_init.te).
 sys.usb.ffs.aio_compat=1
 
-# Bluetooth: CONSYS FW advertises LE Data Length Extension (LE features byte0
-# bit 0x20) but returns "Unknown HCI Command" for LE Read Maximum Data Length;
-
-# bluetooth@1.0-impl quirk (hardware/interfaces) masks the bit.
 ro.vendor.bt.le_features_mask0=0xdf
 
 # Audio: the legacy HAL blob (audio.primary.mt6797.so) is a Nougat build --
@@ -235,15 +139,4 @@ ro.hardware.egl=mali
 # frameworks/base meizu-legacy-vendor skips only the kernel part when this is set.
 ro.vendor.vintf.legacy_kernel=true
 
-# MTK hps hotplug on by default (WORKAROUNDS T3/T4). With hps off all ten
-# cores stay online and deep idle / SODI are never entered: mt_idle.c needs a
-# single online CPU (spm_v2/mt_idle.c:600-603; by_cpu 300/3016 was the only
-
-# only on the hotplug-fixed kernels it recognises by uname (1c4ce619 and its
-# parents 3243163a/f3c39e3e, stop_machine repairs 9866c51b + 56c36fdf); on any
-
-# 16:52 (boots 312c8da2, 954f3c62): thousands of hotplugs, no list_del panic
-# (meizu-fleet designs/MX6_A13_COMPONENT_COVERAGE_20261005.md s.10, 18, 20).
-# A value the user set (setprop persist.vendor.m95.hps 0) lives in /data and
-# overrides this one; that is also the rollback.
 persist.vendor.m95.hps=1

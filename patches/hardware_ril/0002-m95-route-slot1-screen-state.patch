@@ -1,0 +1,12 @@
+diff --git a/libril/ril.cpp b/libril/ril.cpp
+index 5ca390c..454146e 100644
+--- a/libril/ril.cpp
++++ b/libril/ril.cpp
+@@ -361,6 +373,7 @@ addRequestToList(int serial, int slotId, int request) {
+             case RIL_REQUEST_SET_PREFERRED_NETWORK_TYPE: /* 73, base 3 -> 9 */
+             case RIL_REQUEST_GET_PREFERRED_NETWORK_TYPE: /* 74, base 3 -> 9 */
+             case RIL_REQUEST_ALLOW_DATA:                /* 123, base 4 -> 10 */
++            case RIL_REQUEST_SCREEN_STATE:              /* 61, base 1 -> 7 */
+                 reroute = strcmp(route, "legacy") != 0;
+                 break;
+             default:

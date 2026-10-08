@@ -2,15 +2,15 @@
 # BoardConfig.mk — Meizu MX6 (m95, MT6797) on LineageOS 20 (Android 13, SDK 33).
 #
 # Provenance of every non-obvious value is recorded in
-
-
-
+# meizu-fleet/trees/M95_LOS20_TREE.md (FACT / INFERENCE / HYPOTHESIS per
+# /srv/forge/android/CLAUDE.md §2).  Short form:
+#   * boot geometry, partition table, panel, input names  -> DEVICE_FACTS.md
 #     (byte-for-byte vs the stock boot.img / stock scatter / live device);
 #   * Treble + real /vendor on `custom` (mmcblk0p3)       -> the LOS 18.1 tree
 #     device-18.1/meizu/m95 that actually booted this device;
 #   * VNDK 30                                            -> the vendor image
 #     this port already ships (ro.vndk.version=30) and under which the
-
+#     Android 13 GSI reached the launcher on this handset (2026-09-11).
 #
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -28,27 +28,8 @@ BUILD_BROKEN_DUP_RULES := true
 # relaxed for the same reason (see vendor/meizu/m95/Android.mk).
 BUILD_BROKEN_MISSING_REQUIRED_MODULES := true
 
-# Android 11+ запрещает ELF-файлы в PRODUCT_COPY_FILES и требует объявлять их
-# модулями Soong (cc_prebuilt_binary / cc_prebuilt_library_shared). У нас 50
-# таких блобов эпохи Nougat (autokd, batterywarning, aal, akmd09912 и др.) —
-
-#
-# ТЕХНИЧЕСКИЙ ДОЛГ, а не решение: флаг лишь снимает проверку. Правильный путь —
-# сгенерировать модули через extract-files.sh/setup-makefiles.sh. Пока блобы не
-# конвертированы, никто не проверяет их DT_NEEDED — отсутствующая зависимость
-# всплывёт только на устройстве, как «library not found» в logcat.
 BUILD_BROKEN_ELF_PREBUILT_PRODUCT_COPY_FILES := true
 
-# ---------------------------------------------------------------------------
-# Architecture
-# ---------------------------------------------------------------------------
-# MT6797 = 2x Cortex-A72 + 4x Cortex-A53 + 4x Cortex-A53, ARMv8.0-A.
-# NO ARMv8.1 / ARMv8.2 flags and no cortex-a55/a75/a76 cpu variant: this core
-# has no LSE atomics, and any inline LSE instruction outside the runtime-
-
-# established by the GSI lane of this project).
-# `generic` is normalised to the empty string by Soong
-# (build/soong/android/arch.go:1781), i.e. plain -march=armv8-a.
 TARGET_ARCH := arm64
 TARGET_ARCH_VARIANT := armv8-a
 TARGET_CPU_ABI := arm64-v8a
@@ -69,75 +50,20 @@ TARGET_BOARD_PLATFORM := mt6797
 TARGET_NO_BOOTLOADER := true
 BOARD_VENDOR := meizu
 
-# ---------------------------------------------------------------------------
-# Kernel — PREBUILT, never rebuilt from this tree.
-# ---------------------------------------------------------------------------
-
-# phone: "Linux version 3.18.22-eng-g1c4ce619 ... Tue Oct 6 17:03:50 MSK 2026",
-# sha256 c3d605a9c91a23532d7c0a3be44231caf2c9d0134fdb4c5944602e24ed4381fb, from
-
-# mx6-irtx-pinctrl @ 1c4ce619 (export line mx6-3.18-a13: LSM6DS3 v2, fence,
-# GIC/binder, ashmem seek, VHT, hotplug stop-work + callback repairs, Wi-Fi
-# assoc IE f3c39e3e, IRTX 3243163a + its DTS pinctrl 1c4ce619). Config
-# f14a9250, DTB 31b6230f. The boot the phone runs is meizu-fleet
-
-# repacked over the ramdisk of boot 2d861d27, NOT the boot.img a ROM build
-# produces from this tree -- flash that file, and use this prebuilt so GIT_HEADS
-# names the right kernel. m95-cpuset.sh's hps gate knows its uname suffix.
-
-# b84b732d...24da7e, copied from the LOS 18.1 build tree), which carried the
-# eBPF, FFS-AIO and dm-bufio/mnt backports Android 13 needs; all of them are in
-# the export line above.
-
-# отсутствует, поэтому kernel.mk берёт ветку прибилта». Это больше не так —
-# исходник пришлось подключить ради generated_kernel_includes (см. ниже),
-# а ветка прибилта теперь удерживается флагом TARGET_FORCE_PREBUILT_KERNEL.
 TARGET_PREBUILT_KERNEL := $(DEVICE_PATH)/prebuilt/Image.gz-dtb
 TARGET_KERNEL_ARCH := arm64
 TARGET_KERNEL_HEADER_ARCH := arm64
 TARGET_KERNEL_VERSION := 3.18
 BOARD_KERNEL_IMAGE_NAME := Image.gz-dtb
 
-# Исходник ядра всё-таки нужен, хоть мы и шьём прибилт: модуль Soong
-# generated_kernel_includes (vendor/lineage/build/soong/Android.bp:21) гонит
-# "make -C $(TARGET_KERNEL_SOURCE) headers_install", и без исходника сборка
-# падает на .dummy_dep с "kernel/meizu/m95: No such file or directory"
-
-#
-
-# Linux 3.18.22. Из него собран прежний прибилт #145 (sha256 b84b732d…24da7e);
-# нынешний (1c4ce619, см. выше) собран из ветки-экспорта того же дерева, где
-# поверх 3522613e только драйверные правки (LSM6DS3, fence, GIC, binder,
-# ashmem, Wi-Fi, hotplug, IRTX) и плоский DTS — UAPI-заголовки не менялись,
-# так что сгенерированные заголовки по-прежнему соответствуют ABI ядра
-# (INFERENCE по списку коммитов экспорта).
 TARGET_KERNEL_SOURCE := kernel/meizu/m95
 TARGET_KERNEL_CONFIG := lineage_m95_defconfig
 
-# НЕ ДОБАВЛЯТЬ СЮДА TARGET_KERNEL_ADDITIONAL_FLAGS ради headers_install —
-
-#   * KERNEL_MAKE_FLAGS собирается в vendor/lineage/config/BoardConfigKernel.mk
-#     (строка 105 обнуляет, 108-226 наполняют) и тут же уходит в Soong через
-#     BoardConfigSoong.mk (EXPORT_TO_SOONG, снимок по `:=`);
-#   * а TARGET_KERNEL_ADDITIONAL_FLAGS читается только в
-#     vendor/lineage/build/tasks/kernel.mk:271 — это фаза make, уже ПОСЛЕ
-#     экспорта, поэтому на genrule generated_kernel_includes не влияет.
-# Проверять так: python3 -c по out/soong/soong.variables, ключ
-# VendorVars.lineageVarsPlugin.KERNEL_MAKE_FLAGS.
-#
-# Настоящая причина падения headers_install была в самом ядре: 3.18 линкует
-# однофайловые хост-программы (scripts/basic/fixdep) правилом host-csingle,
-# которое, в отличие от соседних host-cmulti/host-cxxmulti, не передавало
-# $(HOSTLDFLAGS) — поэтому переданный Lineage флаг -fuse-ld=lld до линковки не
-# доезжал, а GNU ld в песочнице отсутствует намеренно (kernel.mk:264).
-# Исправлено в дереве ядра: m685 commit 3522613e.
 
 # Исходник есть и конфиг задан, поэтому без этого флага kernel.mk:192 полез бы
 # собирать ядро из исходников. Нам нужен именно прибилт: ветка kernel.mk:180-190
 # даёт FULL_KERNEL_BUILD := false и KERNEL_BIN := $(TARGET_PREBUILT_KERNEL).
 TARGET_FORCE_PREBUILT_KERNEL := true
-
-
 
 BOARD_KERNEL_BASE := 0x40078000
 BOARD_KERNEL_OFFSET := 0x00008000
@@ -157,47 +83,8 @@ BOARD_MKBOOTIMG_ARGS := --kernel_offset $(BOARD_KERNEL_OFFSET) \
 # after a denial census, not before the first boot.
 BOARD_KERNEL_CMDLINE += androidboot.selinux=permissive
 
-# Производительность: погасить самые дорогие отладочные механизмы ядра, не
-
-#
-
-# (нынешний 1c4ce619 — из mx6_verified.config, того же конфига #145 с IRTX)
-# отладочного mx6_defconfig Meizu: MT_ENG_BUILD, PROVE_LOCKING, SLUB_DEBUG_ON,
-# DMA_API_DEBUG, MTK_FTRACE_DEFAULT_ENABLE (.config той же сборки, KERNEL_OBJ
-# 18.1, Image.gz-dtb sha256 b84b732d…).  Стоковое user-ядро Flyme ничего из
-# этого не содержит: в его Image нет ни строк lockdep, ни DMA-API, ни проверок
-# SLUB.  Вдобавок LK сам ставит в начало cmdline `slub_debug=O`, что на нашем
-# ядре значит полную отладку SLUB (F/Z/P/U, снятие стека на каждый kmalloc и
-# kfree, медленный путь аллокатора) почти для всех кэшей (mm/slub.c:1205,1224).
-
-# dmesg-first-b13.txt:57), поэтому побеждают:
-#   slub_debug=-             отладка SLUB выключена целиком (mm/slub.c:1228-1229);
-#   lockdep.prove_locking=0  без проверки графа зависимостей на каждом захвате
-#                            блокировки (kernel/locking/lockdep.c:61-62, 3115);
-#   dma_debug=off            без учёта каждого dma_map_* и без предвыделения
-#                            таблицы записей (lib/dma-debug.c:997, 1027-1037);
-#   trace_buf_size=1M        MTK на late_initcall включает ftrace и растит буфер
-#                            до 4 МБ на КАЖДЫЙ CPU (kernel/trace/trace.c:340-341,
-#                            mtk_trace.c:248-267), т.е. 40 МБ ОЗУ при 10 ядрах;
-#                            запись всё равно гасит atrace.rc на late-init.
-# Все четыре только выключают диагностику, поведение драйверов не меняется.
-# Откат — удалить строку.  Проверка на аппарате: /proc/cmdline;
-# /sys/module/lockdep/parameters/prove_locking = 0; в dmesg «DMA-API: debugging
-# disabled on kernel command line»; /sys/kernel/slab/kmalloc-64/red_zone = 0;
-# /sys/kernel/debug/tracing/buffer_size_kb = 1024.
 BOARD_KERNEL_CMDLINE += slub_debug=- lockdep.prove_locking=0 dma_debug=off trace_buf_size=1M
 
-# ---------------------------------------------------------------------------
-# Partitions — A-only, no slots, no dynamic partitions.
-# ---------------------------------------------------------------------------
-# Sizes below come from the stock GPT
-
-# parsed: recovery 30 MiB, custom 512 MiB, boot 16 MiB, cache 432 MiB)
-# EXCEPT `system`, which was grown from 2560 MiB to 4 GiB with sgdisk on
-
-# The post-resize GPT was never captured, so 4294967296 is the documented size,
-# not a measured one — verify with `sgdisk -p /dev/block/mmcblk0` from TWRP
-# before trusting a full-size image.
 BOARD_BOOTIMAGE_PARTITION_SIZE := 16777216
 BOARD_RECOVERYIMAGE_PARTITION_SIZE := 31457280
 BOARD_SYSTEMIMAGE_PARTITION_SIZE := 4294967296
@@ -206,8 +93,6 @@ BOARD_VENDORIMAGE_PARTITION_SIZE := 536870912
 BOARD_FLASH_BLOCK_SIZE := 131072
 AB_OTA_UPDATER := false
 
-# /vendor is a REAL partition: the `custom` partition, mmcblk0p3, 512 MiB
-
 TARGET_COPY_OUT_VENDOR := vendor
 BOARD_VENDORIMAGE_FILE_SYSTEM_TYPE := ext4
 
@@ -215,7 +100,6 @@ BOARD_VENDORIMAGE_FILE_SYSTEM_TYPE := ext4
 BOARD_BUILD_SYSTEM_ROOT_IMAGE := false
 BOARD_USES_RECOVERY_AS_BOOT := false
 TARGET_NO_RECOVERY := false
-
 
 BOARD_HAS_LARGE_FILESYSTEM := true
 TARGET_USERIMAGES_USE_EXT4 := true
@@ -229,11 +113,6 @@ TARGET_RECOVERY_FSTAB := $(DEVICE_PATH)/rootdir/fstab.mt6797
 TARGET_RECOVERY_PIXEL_FORMAT := "RGBX_8888"
 BOARD_HAS_NO_SELECT_BUTTON := true
 
-# ---------------------------------------------------------------------------
-# Display — 1080x1920 FT8716/Sharp.  The kernel does the 180-degree rotation in
-# hardware (CONFIG_MTK_LCM_PHYSICAL_ROTATION="180"); adding a userspace rotation
-
-# ---------------------------------------------------------------------------
 TARGET_SCREEN_WIDTH := 1080
 TARGET_SCREEN_HEIGHT := 1920
 TARGET_SCREEN_DENSITY := 480
@@ -246,50 +125,8 @@ TARGET_SCREEN_DENSITY := 480
 # same switch the 18.1 tree used.
 PRODUCT_FULL_TREBLE_OVERRIDE := true
 
-# BOARD_VNDK_VERSION := 30 was TRIED FIRST and REJECTED — measured, not assumed.
-# The vendor image this port ships today declares ro.vndk.version=30, so pinning
-# the board to the v30 snapshot looked like the obvious match.  Two hard walls,
-
-
-#
-#   1. Every vendor APEX in hardware/interfaces (power, sensors@2.1, usb@1.0,
-#      vibrator, thermal@2.0) stops soong_build.  An apex takes the image
-#      variant vendor.$(BOARD_VNDK_VERSION) (build/soong/apex/apex.go:673) while
-#      an AOSP "vendor: true" cc module takes vendor.$(PLATFORM_VNDK_VERSION)
-#      (build/soong/cc/image.go:515-533 — hardware/interfaces is in soong's
-#      defaultDirectoryIncludedMap, i.e. it is NOT a vendor-proprietary path).
-#      30 != 33, so the apex can never find its own binaries.
-#   2. With the apexes hidden, soong then fails with
-#      `"libc" depends on undefined module "vendor_snapshot"`
-#      (build/soong/cc/cc.go:2144): any module with a vendor.30 image variant
-#      demands a checked-in *vendor snapshot* module, which only exists in trees
-#      that ship prebuilts/vendor/v30.  We build the vendor from source.
-#
-#   And even if both were papered over, the result would be an incoherent
-#   /vendor: our device-tree modules compiled against VNDK 30, but every AOSP
-#   HAL implementation we install (audio@6.0-impl, camera.provider@2.4-impl,
-#   mapper@2.1, composer@2.1-service, ...) compiled against VNDK 33 and then
-#   run in a v30 namespace — forward-incompatible by construction.
-#
-# So the vendor is built against the platform VNDK, exactly as the 18.1 tree
-# did: 18.1 also said BOARD_VNDK_VERSION := current, and on Android 11 "current"
-# simply WAS 30.  The 30-ness of that vendor was never a pin, it was the
-# platform of the day.
 BOARD_VNDK_VERSION := current
 
-# The v30 VNDK apex is still shipped in the system image — see
-# PRODUCT_EXTRA_VNDK_VERSIONS in device.mk.  That is what makes it possible to
-# boot this system with the existing 18.1-built vendor.img (ro.vndk.version=30)
-# for an A/B comparison, and it is the same thing the Android 13 GSI does
-# (build/make/target/product/gsi_release.mk:66), which is the configuration in
-
-
-# NOTE: BOARD_VNDK_RUNTIME_DISABLE (VNDK-lite), which 18.1 used for bring-up, is
-# a KATI_obsolete_var in Android 13 (build/make/core/config.mk:156) — VNDK-lite
-# no longer exists.  Anything that relied on a vendor process seeing
-# /system/lib must now be solved with a vendor-side copy of the library, the
-# way libnetutils is in device.mk.  NOT for a VNDK library the vendor namespace
-# also uses: a /vendor copy shadows the VNDK apex one in EVERY vendor process
 
 
 # HIDL/VINTF device manifest (target-level 3, see the history at its top).
@@ -304,9 +141,6 @@ TARGET_VENDOR_PROP += $(DEVICE_PATH)/vendor.prop
 # buys a paper check and costs a broken CIL mapping build.
 BOARD_VENDOR_SEPOLICY_DIRS += $(DEVICE_PATH)/sepolicy/vendor
 
-# ---------------------------------------------------------------------------
-
-# ---------------------------------------------------------------------------
 BOARD_WLAN_DEVICE := MediaTek
 WPA_SUPPLICANT_VERSION := VER_0_8_X
 BOARD_WPA_SUPPLICANT_DRIVER := NL80211
@@ -329,14 +163,10 @@ WIFI_DRIVER_FW_PATH_PARAM := /dev/wmtWifi
 WIFI_DRIVER_FW_PATH_STA := STA
 WIFI_DRIVER_FW_PATH_AP := AP
 WIFI_DRIVER_FW_PATH_P2P := P2P
-# The MT6797 gen3 driver rejects SIOCSIFHWADDR and the default wifi HAL would
-# leave wlan0 DOWN after the failed MAC change (Android 13 asks for one on every
-
 WIFI_AVOID_IFACE_RESET_MAC_CHANGE := true
 
 # Bluetooth — MTK combo chip (stock /dev/stpbt).
 BOARD_HAVE_BLUETOOTH := true
-
 
 SIM_COUNT := 2
 
@@ -359,8 +189,6 @@ ifeq ($(wildcard hardware/ril/libril/librilmtk_force_needed.c),)
 $(error m95: hardware/ril is not on branch meizu-legacy-vendor (no libril/librilmtk_force_needed.c); rild would be built without librilmtk)
 endif
 
-# MTK gralloc0+fb module wrapped by the mapper@2.1 Gralloc0Hal adapter; the MTK
-
 TARGET_ADDITIONAL_GRALLOC_10_USAGE_BITS ?= 0
 TARGET_ADDITIONAL_GRALLOC_10_USAGE_BITS += | (1 << 26)
 
@@ -369,28 +197,6 @@ TARGET_OTA_ASSERT_DEVICE := m95,M95,m685,MX6,mx6
 # Vendor blobs (real /vendor image).
 include vendor/meizu/m95/BoardConfigVendor.mk
 
-# ---------------------------------------------------------------------------
-
-# ---------------------------------------------------------------------------
-# До этого здесь стоял SELINUX_IGNORE_NEVERALLOWS := true с «четырьмя»
-# нарушениями. Хостовый прогон того же конвейера (m4 -> checkpolicy ->
-# version_policy -> secilc, бинарник байт-в-байт равен precompiled_sepolicy
-# сборки 16.09) показал больше: secilc -- 11 neverallow (включая 54 правила
-# enforce_sysprop_owner), эмуляция sepolicy_neverallows_vendor (вариант
-# user) -- 196. Все сняты в sepolicy/vendor (свойства через
-# vendor_*_prop и переразметку, goodixfpd, и т.д.), разбор --
-
-#
-# На хосте проверено: secilc без -N rc=0; sepolicy_neverallows_vendor
-# (checkpolicy) rc=0; sepolicy_tests.py rc=0; treble_sepolicy_tests
-# CoredomainViolations/ViolatorAttributes/CoreDatatypeViolations rc=0
-# (--fake-treble, т.к. PRODUCT_FULL_TREBLE_OVERRIDE := true); checkfc по
-# file/property/vndservice_contexts OK.
-# НЕ проверено на хосте: treble_sepolicy_tests TrebleCompatMapping (нужны
-# старые плат-политики 28..32), sepolicy-analyze и sepolicy_compat_test.
-# Если сборка упадёт именно на них -- вернуть строку ниже этим же коммитом
-# (git revert), а не глушить отдельные правила.
-# SELINUX_IGNORE_NEVERALLOWS := true
 
 # Camera RAW16: libm95_camera_metadata_raw must be global in the camera provider
 # before MediaTek's metadata store asks dlsym(RTLD_DEFAULT) for the IMX386 stream
@@ -406,13 +212,6 @@ include vendor/meizu/m95/BoardConfigVendor.mk
 TARGET_LD_SHIM_LIBS += \
     /vendor/bin/hw/android.hardware.camera.provider@2.4-service|/vendor/lib/libm95_camera_metadata_raw.so
 
-# SPM firmware trigger (rootdir/init.mt6797.rc, service spm_script). The N blob
-# calls __android_log_print but has no liblog in DT_NEEDED -- on N it resolved
-# through libcutils; on A13 the exec dies: `CANNOT LINK EXECUTABLE
-# "/vendor/bin/spm_loader": cannot locate symbol "__android_log_print"`.
-
-# load. A shim rather than LD_PRELOAD in the rc for the reason given above:
-# under enforcing the init -> spm_loader transition sets AT_SECURE.
 TARGET_LD_SHIM_LIBS += \
     /vendor/bin/spm_loader|liblog.so
 
