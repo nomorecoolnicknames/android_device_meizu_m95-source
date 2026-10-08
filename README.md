@@ -76,3 +76,7 @@ LineageOS and CyanogenMod contributors, the original device-tree authors, and Re
 Legacy camera Looper storage is allocated for the matching vendor ABI. Optional hotplug tuning is exposed through `persist.vendor.m95.hps` only with a kernel that implements the corresponding hotplug fixes. Consumer IR policy permits the source HAL to access `/dev/irtx`. The thermal HAL reads actual available sensors and does not invent thermal thresholds. These changes do not establish smooth GCam frame delivery, stable IMS calls, working Wi-Fi VHT or safe sustained thermals.
 
 Public builds use no pretrusted workstation ADB keys by default. Supply `M95_ADB_KEYS` explicitly only when required for your own test environment. Camera APKs remain separately supplied inputs; `gcam/fetch-gcam.sh` requires the caller's directory and verifies pinned hashes before unpacking.
+
+## Current integration
+
+The WLAN driver command uses the gen3 private-command structure and the supplicant compilation flags. The SUPL compatibility library implements authenticated TLS with the legacy BIO layout. Hotplug control is enabled for a matching kernel implementing the necessary fixes. These changes require physical WLAN, location and sustained-load validation. The public RIL SMS correction remains under `patches/hardware_ril/`; apply it to the matching platform sources. Stock-derived carrier profile XML and kernel binaries are supplied separately.

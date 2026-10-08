@@ -27,8 +27,12 @@
 #include "android_drv.h"
 #endif
 
+/* Layout of priv_driver_cmd_t in the gen3 driver (gl_wext_priv.c): the
+ * command lives inside the struct, not behind a pointer.  The kernel
+ * copy_from_user()s all of it and never copies a reply back. */
+#define MTK_PRIV_CMD_SIZE 512
 typedef struct android_wifi_priv_cmd {
-    char *buf;
+    char buf[MTK_PRIV_CMD_SIZE];
     int used_len;
     int total_len;
 } android_wifi_priv_cmd;
@@ -610,9 +614,11 @@ int wpa_driver_nl80211_driver_cmd(void *priv, char *cmd, char *buf,
         memset(&priv_cmd, 0, sizeof(priv_cmd));
         os_strlcpy(ifr.ifr_name, bss->ifname, IFNAMSIZ);
 
-        priv_cmd.buf = buf;
-        priv_cmd.used_len = buf_len;
-        priv_cmd.total_len = buf_len;
+        os_strlcpy(priv_cmd.buf, cmd, sizeof(priv_cmd.buf));
+        /* total_len is the size of the kernel's copy of buf, which the
+         * driver may write into: never more than the array. */
+        priv_cmd.used_len = sizeof(priv_cmd.buf);
+        priv_cmd.total_len = sizeof(priv_cmd.buf);
         ifr.ifr_data = &priv_cmd;
 
         if ((ret = ioctl(drv->global->ioctl_sock, SIOCDEVPRIVATE + 1, &ifr)) < 0) {
@@ -624,10 +630,9 @@ int wpa_driver_nl80211_driver_cmd(void *priv, char *cmd, char *buf,
                             __func__, ret , priv_cmd.used_len, priv_cmd.total_len);
 
             drv_errors = 0;
+            /* No reply comes back from the driver: report an empty one. */
+            buf[0] = '\0';
             ret = 0;
-                    ret = priv_cmd.used_len;
-                if ((os_strncasecmp(cmd, "WLS_BATCHING", 12) == 0))
-                        ret = strlen(buf);
             if (os_strncasecmp(cmd, "SETBAND", 7) == 0) {
                 wpa_printf(MSG_INFO, "%s: Unsupported command SETBAND\n",__func__);
                     }

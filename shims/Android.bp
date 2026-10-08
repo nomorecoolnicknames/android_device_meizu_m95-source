@@ -189,7 +189,7 @@ cc_library_shared {
 }
 
 // libskia.so — empty DT_NEEDED placebo for libcam.camadapter.so and four other
-// blobs that import zero Sk* symbols (see skia.cpp for the per-consumer FACT).
+
 cc_library_shared {
     name: "libm95shim_skia",
     defaults: ["m95shim_defaults"],
@@ -284,7 +284,9 @@ cc_library_shared {
     name: "libm95shim_ssl",
     defaults: ["m95shim_defaults"],
     srcs: ["ssl.c"],
-    shared_libs: ["libssl"],
+    // libssl stays a dependency so it loads right after this shim; every
+    // libssl/libcrypto call is resolved with dlsym(RTLD_NEXT) (see ssl.c).
+    shared_libs: ["libssl", "liblog", "libdl"],
 }
 
 // No-op pthread_mutex_destroy for mnld (ELF32): libmnl.so destroys its

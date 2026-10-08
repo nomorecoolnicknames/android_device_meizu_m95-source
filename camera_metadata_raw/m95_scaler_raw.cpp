@@ -1,93 +1,96 @@
-/*
- * Add the streams the sensors can produce but their tables never list: RAW16 at
- * the rear pixel array, and 4:3 preview sizes between 640x480 and the stills.
- *
- * Ported from the LOS16 tree (meizu_mx6_m95/los/device/meizu/m95/
- * camera_metadata_raw, last change f8036f9). What changed on the way is listed
- * at the end of this comment; the reasoning below is the LOS16 one and still
- * holds.
- *
- * MediaTek's metadata store does not hold the per-sensor stream table as data.
- * It asks for it: MetadataProvider builds a symbol name from the sensor's driver
- * name and calls dlsym(RTLD_DEFAULT, ...) for
- *
- *   constructCustStaticMetadata_DEVICE_SCALER_SENSOR_DRVNAME_<driver>
- *
- * and uses whoever answers first. The section shipped for IMX386_SUNNY carries
- * JPEG, YUV and implementation-defined rows and not one raw row, so
- * android.scaler.availableStreamConfigurations reaches the framework without a
- * raw entry -- and, what matters more, so does the vendor's own copy of that
- * tag, the one AppStreamMgr::checkStream and the pipeline read. The omission is
- * in that one table, not in the sensor: the same library authorises raw for
- * S5K2L7 at its native 4032x3024, and on LOS16 a RAW16 4032x3016 frame arrived
- * and a 24MB DNG was written while this row was present (2026-08-19).
- *
- * The same tables stop at 640x480 for 4:3 below the stills, so an application
- * that wants a 4:3 viewfinder -- every Google Camera build -- gets 640x480 and
- * stretches it over a 1080-wide screen. The pipeline itself does better: on the
- * HAL1 path the stock preview was 1440x1080, with the pass-1 resizer at exactly
- * that size ("[decideRrzoImage] referenceSize:1440x1080 actual size:1440x1080",
- * P2 dump wdmao-1440x1080-1440_720_720-yv12, meizu_mx6_m95/
- * CAMERA_PREVIEW_WIDTH_TRIAGE.md). The rows are YCbCr_420_888 only:
- * MetadataProvider::updateData (metastore 0x4312e-0x431ec) copies every YUV
- * output row of 0xd000a/b/c into IMPLEMENTATION_DEFINED and YV12 rows after the
- * sensor sections have run, which is where the second 34 and the YV12 groups in
- * dumpsys come from. A PRIVATE preview stream is accepted by checkStream only
- * through such a row -- the validator patch lets unknown sizes through for YUV
- * alone.
- *
- * This library answers the call, and then hands it straight back. It resolves
- * the store's own implementation by name within the store itself, lets it fill
- * the metadata exactly as it always has, and only then appends rows.
- *
- * Appending rather than replacing is the whole point, and it was learned the
- * expensive way. An earlier version renamed the blob's export and published a
- * whole table read back from a running handset. It looked right -- raw arrived,
- * a 24MB DNG came out of the probe -- but every preview on the phone went black
- * and the stock camera first crashed, then hung, and nobody noticed for hours
- * because the only thing being measured was a raw capture. The section sets
- * more than anyone had seen: the blob's IMX386_SUNNY function (metastore
- * 0x1a808) builds at least seven tags, among them the jpeg sizes as three MSize
- * values rather than int32 (push_back<MSize> at 0x1a848) and the maximum jpeg
- * size (0x70008) -- none of which a dump of the stream table shows.
- *
- * So this library never decides what the table should contain. It writes
- * whole rows into three tags and leaves everything else as the vendor left it;
- * if the vendor left those tags in a shape it does not recognise, it adds
- * nothing and the camera gets exactly what it would have got without it.
- *
- * For our answer to be the one found, this library has to be global in the
- * provider process: bionic's dlsym(RTLD_DEFAULT) walks only RTLD_GLOBAL
- * libraries in load order, and falls back to the caller's own local group only
- * when that finds nothing (bionic/linker/linker.cpp dlsym_linear_lookup). The
- * store is loaded as a dependency of the dlopen'ed camera HAL, so it is local.
- * The library is a TARGET_LD_SHIM_LIBS shim of the provider executable
- * (BoardConfig.mk), which the linker loads RTLD_GLOBAL ahead of the
- * executable's own DT_NEEDED; LD_PRELOAD would be discarded, because the
- * provider starts with AT_SECURE set. Nothing in the blob is touched: renaming
- * its export would also put its own implementation out of reach, because the
- * lookup hash is built from the original strings.
- *
- * Changes from LOS16:
- *  - The NSCam declarations come from m95_nscam_metadata.h, decoded from the
- *    blob's vtables. In this blob entryFor() returns a reference; see there.
- *  - No link against any camera blob. The shim is linked before
- *    libmtkcam_metadata is in the process, and a symbol it cannot bind there
- *    stops the provider from starting at all.
- *  - The branch that published a whole section when the vendor's table came
- *    back empty is gone. Its data was a partial reconstruction (six tags, jpeg
- *    sizes as int32 where the blob writes MSize, no maximum jpeg size), and it
- *    was the branch live when previews went black.
- *  - Each addition has its own switch, persist.camera.raw and
- *    persist.camera.preview_43; with both off (or unset) the library is a
- *    pass-through.
- *  - All three tables are checked before any is edited. editEntryFor aborts on
- *    a tag that does not exist, and the LOS16 code only checked the first one.
- *  - The front sensor's section is answered too, for the 4:3 preview rows only.
- *    Appending to a vendor-built table proved itself on the rear (LOS20 build
- *    18: RAW row present, previews live); the front gets no raw row, because
- *    nothing on this device has shown its pipeline delivering one.
- */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #include <dlfcn.h>
 #include <stddef.h>
@@ -137,6 +140,16 @@ struct Row {
 // question would never see raw at all.
 const Row kRearRaw = {0x20 /* HAL_PIXEL_FORMAT_RAW16 */, 4032, 3016, 33333333LL, 33333333LL};
 
+
+// and pixelArraySize 2592x1944). The framework copy already claims this row
+// (persist.camera.raw_front, CameraModule.cpp), because Google Camera dies at
+// start on a camera without raw sizes. Without the same row here the vendor's
+// checkStream refuses the stream GCam configures from that claim: the front
+// stayed UNCONFIGURED with a black viewfinder and GCam reopened it in a loop
+
+// so the two copies cannot disagree.
+const Row kFrontRaw = {0x20 /* HAL_PIXEL_FORMAT_RAW16 */, 2592, 1944, 33333333LL, 33333333LL};
+
 // 4:3 viewfinder sizes, YCbCr_420_888 at 30 fps and no stall, like the vendor's
 // own YUV rows. 1440x1080 is the stock preview and the one a 1080-wide screen
 // asks for; 1280x960 is the next step down for applications that cap below
@@ -184,7 +197,7 @@ void appendRow(IMetadata* metadata, const Row& row) {
 // what the switches ask for. `self` is the exported answer calling this, so the
 // lookup can tell the store's function from ours.
 int extendSection(IMetadata* metadata, void const* info, const char* symbol, ConstructFn self,
-                  bool rawAllowed) {
+                  const Row& rawRow, const char* rawProp) {
     if (metadata == NULL) {
         return -1;
     }
@@ -223,10 +236,10 @@ int extendSection(IMetadata* metadata, void const* info, const char* symbol, Con
     // Off switches: read when the provider builds its static metadata, so they
     // take a provider restart, not a reflash. With both off the camera gets
     // exactly what the vendor built.
-    const bool raw = rawAllowed && property_get_bool("persist.camera.raw", false);
+    const bool raw = property_get_bool(rawProp, false);
     const bool preview43 = property_get_bool("persist.camera.preview_43", false);
     if (!raw && !preview43) {
-        ALOGI("persist.camera.raw / preview_43 off; vendor table passed through");
+        ALOGI("%s / preview_43 off; vendor table passed through", rawProp);
         return status;
     }
 
@@ -235,7 +248,7 @@ int extendSection(IMetadata* metadata, void const* info, const char* symbol, Con
         tableIsWhole(metadata, MTK_SCALER_AVAILABLE_MIN_FRAME_DURATIONS) &&
         tableIsWhole(metadata, MTK_SCALER_AVAILABLE_STALL_DURATIONS)) {
         if (raw) {
-            appendRow(metadata, kRearRaw);
+            appendRow(metadata, rawRow);
         }
         if (preview43) {
             for (size_t i = 0; i < sizeof(kPreview43) / sizeof(kPreview43[0]); ++i) {
@@ -253,7 +266,7 @@ constructCustStaticMetadata_DEVICE_SCALER_SENSOR_DRVNAME_IMX386_SUNNY_MIPI_RAW(
         IMetadata* metadata, void const* info) {
     return extendSection(metadata, info, kRearSymbol,
                          &constructCustStaticMetadata_DEVICE_SCALER_SENSOR_DRVNAME_IMX386_SUNNY_MIPI_RAW,
-                         true);
+                         kRearRaw, "persist.camera.raw");
 }
 
 extern "C" __attribute__((visibility("default"))) int
@@ -261,5 +274,5 @@ constructCustStaticMetadata_DEVICE_SCALER_SENSOR_DRVNAME_OV5695_MIPI_RAW(
         IMetadata* metadata, void const* info) {
     return extendSection(metadata, info, kFrontSymbol,
                          &constructCustStaticMetadata_DEVICE_SCALER_SENSOR_DRVNAME_OV5695_MIPI_RAW,
-                         false);
+                         kFrontRaw, "persist.camera.raw_front");
 }
